@@ -7,8 +7,13 @@ from cairn.dispatcher.config import WorkerConfig
 from cairn.dispatcher.workers.base import DriverResult, WorkerDriver
 
 
-# opencode `--format json` event-stream field names. Confirm against a real
-# captured stream in Task 3 and adjust here if the schema differs.
+# opencode `--format json` event-stream field names. UNVERIFIED against a live
+# opencode stream (captured at integration time) — confirm against a real capture
+# and adjust if the schema differs.
+# NOTE: the trailing bare "id" is the highest false-match risk — validate it first.
+# `_find_session_id` returns the first matching field anywhere under `_ENVELOPE_KEYS`,
+# so a non-session `id` (e.g. a message/part id) emitted before the session event
+# could be picked up by mistake. Drop "id" once the real session field is confirmed.
 _SESSION_ID_FIELDS = ("sessionID", "sessionId", "session_id", "id")
 _ENVELOPE_KEYS = ("properties", "info", "session", "message", "part", "data")
 _TEXT_PART_TYPE = "text"
