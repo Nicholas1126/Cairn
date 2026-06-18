@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from cairn.dispatcher.config import DispatchConfig, WorkerConfig, validate_prompt_resources
 from cairn.dispatcher.workers.adapters.codex import CodexDriver
+from cairn.dispatcher.workers.adapters.opencode import OpenCodeDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 
 from conftest import make_config
@@ -133,6 +134,64 @@ def test_codex_driver_execute_argv_passes_model_endpoint_and_prompt() -> None:
     assert "gpt-test" in argv
     assert 'model_providers.cairn.base_url="http://api/v1"' in argv
     assert argv[-2:] == ["--", "prompt"]
+
+
+def _opencode_worker() -> WorkerConfig:
+    return WorkerConfig.model_validate(
+        {
+            "name": "oc",
+            "type": "opencode",
+            "task_types": ["explore"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {
+                "OPENCODE_MODEL": "glm-test",
+                "OPENCODE_BASE_URL": "http://gw/v1",
+                "OPENCODE_API_KEY": "secret",
+            },
+        }
+    )
+
+
+def test_opencode_execute_argv_uses_json_format_and_custom_provider() -> None:
+    result = OpenCodeDriver().build_execute(_opencode_worker(), "prompt", None)
+    argv = result.argv
+
+    # /bin/sh wrapper: argv[4] is the inline opencode config JSON.
+    config = json.loads(argv[4])
+    provider = config["provider"]["cairn"]
+    assert provider["options"]["baseURL"] == "http://gw/v1"
+    assert provider["options"]["apiKey"] == "secret"
+    assert "glm-test" in provider["models"]
+    assert provider["npm"] == "@ai-sdk/openai-compatible"
+
+    assert "run" in argv
+    assert "--format" in argv and "json" in argv
+    assert "-m" in argv and "cairn/glm-test" in argv
+    assert "-s" not in argv  # new session
+    assert argv[-2:] == ["--", "prompt"]
+
+
+def test_opencode_conclude_argv_resumes_session() -> None:
+    argv = OpenCodeDriver().build_conclude(_opencode_worker(), "prompt", "sess-9")
+    assert "-s" in argv
+    assert argv[argv.index("-s") + 1] == "sess-9"
+    assert argv[-2:] == ["--", "prompt"]
+
+
+def test_opencode_healthcheck_runs_pong_prompt() -> None:
+    argv = OpenCodeDriver().build_healthcheck(_opencode_worker())
+    assert "run" in argv
+    assert "-m" in argv and "cairn/glm-test" in argv
+    assert argv[-1] == "Reply with exactly pong."
+
+
+def test_opencode_provider_npm_override_is_respected() -> None:
+    worker = _opencode_worker()
+    worker.env["OPENCODE_PROVIDER_NPM"] = "@ai-sdk/anthropic"
+    argv = OpenCodeDriver().build_execute(worker, "p", None).argv
+    config = json.loads(argv[4])
+    assert config["provider"]["cairn"]["npm"] == "@ai-sdk/anthropic"
 
 
 def test_opencode_worker_requires_core_env_keys() -> None:
