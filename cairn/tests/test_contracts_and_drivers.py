@@ -12,6 +12,7 @@ from cairn.dispatcher.contracts import (
 from cairn.dispatcher.runtime.process import ManagedProcess
 from cairn.dispatcher.workers.adapters.opencode import OpenCodeDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
+from cairn.dispatcher.workers.registry import get_driver
 
 
 def test_parse_json_output_extracts_object_from_markdown_noise() -> None:
@@ -123,4 +124,9 @@ def test_close_stream_closes_response_even_when_stream_close_fails() -> None:
     ManagedProcess._close_stream(stream)
 
     assert stream._response.closed
+
+
+def test_opencode_driver_is_registered() -> None:
+    driver = get_driver("opencode")
+    assert driver.type_name == "opencode"
 
