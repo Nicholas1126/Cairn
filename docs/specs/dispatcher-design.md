@@ -779,25 +779,25 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 健康检查使用 opencode 级别的 "pong" 运行：
 
 ```bash
-opencode run --format json -m "cairn/{env.OPENCODE_MODEL}" -- "Reply with exactly pong."
+opencode run --pure -m "cairn/{env.OPENCODE_MODEL}" -- "Reply with exactly pong."
 ```
 
 已知行为：
 
-- driver 预先生成 session id
+- session id 从 opencode `--format json` 事件流中提取（执行后由 `extract_session` 解析），driver 不预先生成 session id
 - `OPENCODE_CONFIG_CONTENT` 在每次执行时动态注入，不依赖磁盘配置
-- Dispatcher 固定从 `stdout` 取全文作为结果正文
+- 结果正文从 `--format json` 事件流中解析 assistant 文本；解析不到时回退为 `stdout` 全文
 
-第一阶段执行：
+第一阶段执行（新建 session，不带 `-s`）：
 
 ```bash
-opencode run --format json -s "{session}" -m "cairn/{env.OPENCODE_MODEL}" -- "{prompt}"
+opencode run --pure --format json --dangerously-skip-permissions -m "cairn/{env.OPENCODE_MODEL}" -- "{prompt}"
 ```
 
-二阶段收尾：
+二阶段收尾（带 `-s` 续接同一 session）：
 
 ```bash
-opencode run --format json -s "{session}" -m "cairn/{env.OPENCODE_MODEL}" -- "{prompt}"
+opencode run --pure --format json --dangerously-skip-permissions -s "{session}" -m "cairn/{env.OPENCODE_MODEL}" -- "{prompt}"
 ```
 
 #### `mock` driver
