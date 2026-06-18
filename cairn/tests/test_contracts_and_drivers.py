@@ -10,6 +10,7 @@ from cairn.dispatcher.contracts import (
     validate_reason_payload,
 )
 from cairn.dispatcher.runtime.process import ManagedProcess
+from cairn.dispatcher.workers.adapters.opencode import OpenCodeDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 
 
@@ -72,6 +73,35 @@ def test_pi_driver_extracts_session_and_last_assistant_text() -> None:
 
     assert driver.extract_session(None, stdout, "") == "session-123"
     assert driver.extract_response_text(stdout, "") == '{"accepted":true,"data":{}}'
+
+
+# NOTE: opencode --format json event shape below is our best-guess and is UNVERIFIED
+# against a live opencode stream (no gateway creds at implementation time). Reconfirm
+# field names against a real capture and adjust the constants in opencode.py if needed.
+def test_opencode_extracts_session_and_assistant_text() -> None:
+    driver = OpenCodeDriver()
+    stdout = "\n".join(
+        [
+            json.dumps({"type": "session.updated", "properties": {"info": {"id": "ses_test123"}}}),
+            json.dumps(
+                {
+                    "type": "message.part.updated",
+                    "properties": {"part": {"type": "text", "text": "pong"}},
+                }
+            ),
+        ]
+    )
+
+    assert driver.extract_session(None, stdout, "") == "ses_test123"
+    assert driver.extract_response_text(stdout, "") == "pong"
+
+
+def test_opencode_extract_session_is_noop_when_already_set() -> None:
+    assert OpenCodeDriver().extract_session("ses_keep", "anything", "") == "ses_keep"
+
+
+def test_opencode_extract_response_falls_back_to_stdout() -> None:
+    assert OpenCodeDriver().extract_response_text("not json at all", "") == "not json at all"
 
 
 def test_close_stream_closes_response_even_when_stream_close_fails() -> None:

@@ -68,6 +68,79 @@ class OpenCodeDriver(WorkerDriver):
             *opencode_argv,
         ]
 
+    def extract_session(self, session: str | None, stdout: str, stderr: str) -> str | None:
+        if session:
+            return session
+        for event in self._iter_events(stdout):
+            found = self._find_session_id(event)
+            if found:
+                return found
+        return None
+
+    def extract_response_text(self, stdout: str, stderr: str) -> str:
+        parts: list[str] = []
+        for event in self._iter_events(stdout):
+            parts.extend(self._collect_text(event))
+        return "\n".join(parts).strip() or stdout
+
+    @staticmethod
+    def _iter_events(stdout: str) -> list[dict[str, Any]]:
+        text = stdout.strip()
+        if not text:
+            return []
+        # opencode may emit a single JSON array or newline-delimited objects.
+        try:
+            whole = json.loads(text)
+        except json.JSONDecodeError:
+            whole = None
+        if isinstance(whole, list):
+            return [e for e in whole if isinstance(e, dict)]
+        if isinstance(whole, dict):
+            return [whole]
+        events: list[dict[str, Any]] = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                events.append(payload)
+        return events
+
+    @classmethod
+    def _find_session_id(cls, event: dict[str, Any]) -> str | None:
+        for key in _SESSION_ID_FIELDS:
+            value = event.get(key)
+            if isinstance(value, str) and value:
+                return value
+        for key in _ENVELOPE_KEYS:
+            nested = event.get(key)
+            if isinstance(nested, dict):
+                found = cls._find_session_id(nested)
+                if found:
+                    return found
+        return None
+
+    @classmethod
+    def _collect_text(cls, event: dict[str, Any]) -> list[str]:
+        out: list[str] = []
+        if event.get("type") == _TEXT_PART_TYPE:
+            text = event.get("text")
+            if isinstance(text, str) and text:
+                out.append(text)
+        for key in _ENVELOPE_KEYS:
+            nested = event.get(key)
+            if isinstance(nested, dict):
+                out.extend(cls._collect_text(nested))
+            elif isinstance(nested, list):
+                for item in nested:
+                    if isinstance(item, dict):
+                        out.extend(cls._collect_text(item))
+        return out
+
     @staticmethod
     def _config_json(worker: WorkerConfig) -> str:
         env = worker.env
