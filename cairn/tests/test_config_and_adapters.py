@@ -133,3 +133,35 @@ def test_codex_driver_execute_argv_passes_model_endpoint_and_prompt() -> None:
     assert "gpt-test" in argv
     assert 'model_providers.cairn.base_url="http://api/v1"' in argv
     assert argv[-2:] == ["--", "prompt"]
+
+
+def test_opencode_worker_requires_core_env_keys() -> None:
+    with pytest.raises(ValidationError, match="missing env keys"):
+        WorkerConfig.model_validate(
+            {
+                "name": "oc",
+                "type": "opencode",
+                "task_types": ["explore"],
+                "max_running": 1,
+                "priority": 0,
+                "env": {"OPENCODE_MODEL": "m"},  # missing BASE_URL + API_KEY
+            }
+        )
+
+
+def test_opencode_worker_accepts_full_env() -> None:
+    worker = WorkerConfig.model_validate(
+        {
+            "name": "oc",
+            "type": "opencode",
+            "task_types": ["explore"],
+            "max_running": 1,
+            "priority": 0,
+            "env": {
+                "OPENCODE_MODEL": "m",
+                "OPENCODE_BASE_URL": "http://gw/v1",
+                "OPENCODE_API_KEY": "secret",
+            },
+        }
+    )
+    assert worker.type == "opencode"
