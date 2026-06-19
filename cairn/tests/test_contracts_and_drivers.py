@@ -76,18 +76,25 @@ def test_pi_driver_extracts_session_and_last_assistant_text() -> None:
     assert driver.extract_response_text(stdout, "") == '{"accepted":true,"data":{}}'
 
 
-# NOTE: opencode --format json event shape below is our best-guess and is UNVERIFIED
-# against a live opencode stream (no gateway creds at implementation time). Reconfirm
-# field names against a real capture and adjust the constants in opencode.py if needed.
+# Event shape captured from a real `opencode run --format json` stream (opencode
+# 1.15.0, dashscope openai-compatible provider): each stdout line is one JSON event,
+# session id is a top-level "sessionID", assistant text is at part.text.
 def test_opencode_extracts_session_and_assistant_text() -> None:
     driver = OpenCodeDriver()
     stdout = "\n".join(
         [
-            json.dumps({"type": "session.updated", "properties": {"info": {"id": "ses_test123"}}}),
             json.dumps(
                 {
-                    "type": "message.part.updated",
-                    "properties": {"part": {"type": "text", "text": "pong"}},
+                    "type": "step_start",
+                    "sessionID": "ses_test123",
+                    "part": {"id": "prt_1", "messageID": "msg_1", "type": "step-start"},
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "text",
+                    "sessionID": "ses_test123",
+                    "part": {"id": "prt_2", "messageID": "msg_1", "type": "text", "text": "pong"},
                 }
             ),
         ]

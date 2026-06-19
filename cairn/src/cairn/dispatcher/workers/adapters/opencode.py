@@ -7,15 +7,16 @@ from cairn.dispatcher.config import WorkerConfig
 from cairn.dispatcher.workers.base import DriverResult, WorkerDriver
 
 
-# opencode `--format json` event-stream field names. UNVERIFIED against a live
-# opencode stream (captured at integration time) — confirm against a real capture
-# and adjust if the schema differs.
-# NOTE: the trailing bare "id" is the highest false-match risk — validate it first.
-# `_find_session_id` returns the first matching field anywhere under `_ENVELOPE_KEYS`,
-# so a non-session `id` (e.g. a message/part id) emitted before the session event
-# could be picked up by mistake. Drop "id" once the real session field is confirmed.
-_SESSION_ID_FIELDS = ("sessionID", "sessionId", "session_id", "id")
-_ENVELOPE_KEYS = ("properties", "info", "session", "message", "part", "data")
+# opencode `--format json` event-stream field names. VERIFIED against opencode
+# 1.15.0 (dashscope openai-compatible provider). Each stdout line is one JSON
+# event; the session id is a top-level "sessionID" on every event, and assistant
+# text is carried as `{"type":"text", "part":{"type":"text","text":...}}`, e.g.:
+#   {"type":"step_start","sessionID":"ses_...","part":{...,"type":"step-start"}}
+#   {"type":"text","sessionID":"ses_...","part":{"type":"text","text":"pong",...}}
+# `_SESSION_ID_FIELDS` is intentionally just "sessionID" (no bare "id") so a
+# message/part id can never be mistaken for the session id.
+_SESSION_ID_FIELDS = ("sessionID",)
+_ENVELOPE_KEYS = ("part",)
 _TEXT_PART_TYPE = "text"
 
 _DEFAULT_PROVIDER_NPM = "@ai-sdk/openai-compatible"
@@ -56,13 +57,16 @@ class OpenCodeDriver(WorkerDriver):
         return argv
 
     def _wrap(self, worker: WorkerConfig, opencode_argv: list[str]) -> list[str]:
+        # stdin is redirected from /dev/null: opencode's `run` blocks waiting on a
+        # TTY/stdin otherwise. The dispatcher already execs workers with stdin=False,
+        # but this keeps the command correct if invoked any other way.
         script = (
             'cfg="$1"\n'
             "shift 1\n"
             'exec env OPENCODE_CONFIG_CONTENT="$cfg" '
             "OPENCODE_DISABLE_AUTOUPDATE=1 "
             "OPENCODE_DISABLE_MODELS_FETCH=1 "
-            'opencode "$@"\n'
+            'opencode "$@" </dev/null\n'
         )
         return [
             "/bin/sh",
