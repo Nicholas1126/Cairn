@@ -609,21 +609,22 @@ Dispatcher 固定从 `stdout` 取全文作为模型正文输出。
 | 字段 | 含义 | 说明 |
 | --- | --- | --- |
 | `name` | Worker 静态标识 | 协议写回时作为 `creator` 或 `worker` |
-| `type` | Worker driver 名 | 支持 `claudecode`、`codex`、`mock` |
+| `type` | Worker driver 名 | 支持 `claudecode`、`codex`、`opencode`、`mock` |
 | `task_types` | 支持的任务类型 | `bootstrap`、`reason`、`explore` |
 | `max_running` | Worker 并发上限 | 达到上限后暂不派发 |
 | `priority` | 选择优先级 | 数字越小越优先 |
 | `env` | 运行时环境变量 | 由对应 driver 使用；`mock` 的 phase 耗时和结果概率也通过这里配置 |
 
-系统提供三类 Worker driver：
+系统提供四类 Worker driver：
 
 - `claudecode`
 - `codex`
+- `opencode`
 - `mock`
 
 也就是说：
 
-- `dispatch.yaml` 负责声明“用哪个 driver、能跑什么任务、并发多少、环境变量是什么”；如果是 `mock`，各 phase 的模拟分布也放在 `env`
+- `dispatch.yaml` 负责声明”用哪个 driver、能跑什么任务、并发多少、环境变量是什么”；如果是 `mock`，各 phase 的模拟分布也放在 `env`
 - 具体怎么健康检查、怎么启动命令、怎么提取 session、怎么恢复 `conclude`，都由 driver 代码负责
 
 ### Driver 接口
@@ -643,6 +644,7 @@ Dispatcher 固定从 `stdout` 取全文作为模型正文输出。
 
 - `claudecode` 支持双阶段 `explore`
 - `codex` 支持双阶段 `explore`
+- `opencode` 支持双阶段 `explore`
 - `mock` 支持双阶段 `explore`
 
 并发建模约定：
@@ -763,6 +765,41 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
   -- "{prompt}"
 ```
 
+#### `opencode` driver
+
+依赖环境变量：
+
+- `OPENCODE_MODEL`
+- `OPENCODE_BASE_URL`
+- `OPENCODE_API_KEY`
+- `OPENCODE_PROVIDER_NPM`（可选；默认 `@ai-sdk/openai-compatible`）
+
+模型通过一个名为 `cairn` 的自定义 provider 路由。driver 在运行时将完整 provider 配置序列化为 JSON 后写入 `OPENCODE_CONFIG_CONTENT` 环境变量，opencode 进程直接从该变量加载配置，无需在磁盘上写入配置文件。opencode 以 `cairn/<OPENCODE_MODEL>` 的形式引用模型，`OPENCODE_BASE_URL` 和 `OPENCODE_API_KEY` 即为该 provider 的接入地址与凭证。
+
+健康检查使用 opencode 级别的 "pong" 运行：
+
+```bash
+opencode run --pure -m "cairn/{env.OPENCODE_MODEL}" -- "Reply with exactly pong."
+```
+
+已知行为：
+
+- session id 从 opencode `--format json` 事件流中提取（执行后由 `extract_session` 解析），driver 不预先生成 session id
+- `OPENCODE_CONFIG_CONTENT` 在每次执行时动态注入，不依赖磁盘配置
+- 结果正文从 `--format json` 事件流中解析 assistant 文本；解析不到时回退为 `stdout` 全文
+
+第一阶段执行（新建 session，不带 `-s`）：
+
+```bash
+opencode run --pure --format json --dangerously-skip-permissions -m "cairn/{env.OPENCODE_MODEL}" -- "{prompt}"
+```
+
+二阶段收尾（带 `-s` 续接同一 session）：
+
+```bash
+opencode run --pure --format json --dangerously-skip-permissions -s "{session}" -m "cairn/{env.OPENCODE_MODEL}" -- "{prompt}"
+```
+
 #### `mock` driver
 
 `mock` driver 用于本地观察 dispatcher 的成功、失败和超时路径。
@@ -824,9 +861,9 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 - 每个 Worker 都必须有 `type`
 - 每个 Worker 都必须有 `max_running`
 - `task_types` 只允许 `bootstrap`、`reason`、`explore`
-- `type` 只允许 `claudecode`、`codex`、`mock`
+- `type` 只允许 `claudecode`、`codex`、`opencode`、`mock`
 - `max_running` 必须是正整数
-- `claudecode`、`codex`、`mock` 都支持双阶段 `explore`
+- `claudecode`、`codex`、`opencode`、`mock` 都支持双阶段 `explore`
 - `runtime.prompt_group` 对应的 prompt 目录必须存在
 - 代码工程中的 prompt 资源必须存在
 - 默认 prompt 组下，`reason.md` 必须至少覆盖 `{graph_yaml}`、`{fact_ids}`、`{open_intents}`
@@ -909,7 +946,7 @@ codex exec resume "{session}" --dangerously-bypass-approvals-and-sandbox --model
 | 字段 | 必填 | 含义 |
 | --- | --- | --- |
 | `name` | 是 | Worker 静态标识；协议写回时使用这个值作为 `creator` 或 `worker` |
-| `type` | 是 | Worker driver 名；支持 `claudecode`、`codex`、`mock` |
+| `type` | 是 | Worker driver 名；支持 `claudecode`、`codex`、`opencode`、`mock` |
 | `task_types` | 是 | 该 Worker 支持的任务类型列表 |
 | `max_running` | 是 | 该 Worker 自身的并发上限 |
 | `priority` | 是 | 当前任务类型的候选 Worker 中，数字越小优先级越高 |
@@ -1000,6 +1037,17 @@ workers:
       CODEX_MODEL: "gpt-5.4"
       CODEX_BASE_URL: "https://api.example.com/v1"
       OPENAI_API_KEY: "sk-worker-d"
+
+  - name: "opencode-qwen3"
+    type: "opencode"
+    task_types: [bootstrap, reason, explore]
+    max_running: 1
+    priority: 5
+    env:
+      OPENCODE_MODEL: "qwen3-235b-a22b"
+      OPENCODE_BASE_URL: "https://api.example.com/v1"
+      OPENCODE_API_KEY: "sk-worker-e"
+      # OPENCODE_PROVIDER_NPM: "@ai-sdk/openai-compatible"  # default
 
   - name: "mock-observer"
     type: "mock"
