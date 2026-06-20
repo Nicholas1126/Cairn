@@ -23,7 +23,7 @@ def test_get_workers(tmp_path, monkeypatch):
 
 def test_post_turn(tmp_path, monkeypatch):
     c = _client(tmp_path)
-    def fake_run_turn(worker, message, session):
+    def fake_run_turn(worker, message, session, debug=False):
         return ChatTurnResult(reply="pong", session="ses_1", command=["opencode", "run"],
                               prompt=message, stdout="raw", exit_code=0, outcome="success", duration_ms=12)
     monkeypatch.setattr(chat, "run_turn", fake_run_turn)

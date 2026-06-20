@@ -15,4 +15,9 @@ def get_chat_workers():
 
 @router.post("/chat/turn", response_model=ChatTurnResult)
 def post_chat_turn(body: ChatTurnRequest):
-    return chat.run_turn(body.worker, body.message, body.session)
+    return chat.run_turn(body.worker, body.message, body.session, body.debug)
+
+
+@router.get("/chat/context")
+def get_chat_context():
+    return {"files": chat.worker_context_files()}

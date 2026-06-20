@@ -70,6 +70,7 @@ class ChatTurnRequest(BaseModel):
     worker: str
     message: str
     session: str | None = None
+    debug: bool = False
 
 
 class ChatTurnResult(BaseModel):

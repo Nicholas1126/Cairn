@@ -35,14 +35,35 @@ def list_workers() -> list[ChatWorker]:
     return [ChatWorker(name=w.name, type=w.type, model=w.env.get(model_env_key(w))) for w in config.workers]
 
 
-def _chat_runtime() -> LocalRuntime:
+def _chat_runtime(debug: bool = False) -> LocalRuntime:
     # parents[4] of cairn/src/cairn/server/chat.py is the repo root /Users/nicholas/project/ai/Cairn
-    agents_source = Path(__file__).resolve().parents[4] / "container"
+    if debug:
+        agents_source = Path(__file__).resolve().parents[4] / "container"
+        return LocalRuntime(
+            workspaces_root=str(cairn_home() / "chats-debug"),
+            completed_action="stop",
+            agents_source=str(agents_source) if agents_source.exists() else None,
+        )
     return LocalRuntime(
         workspaces_root=str(cairn_home() / "chats"),
         completed_action="stop",
-        agents_source=str(agents_source) if agents_source.exists() else None,
+        agents_source=None,
     )
+
+
+def worker_context_files() -> list[dict]:
+    src = Path(__file__).resolve().parents[4] / "container"
+    files: list[dict] = []
+    agents_md = src / "AGENTS.md"
+    if agents_md.is_file():
+        files.append({"name": "AGENTS.md", "content": agents_md.read_text(encoding="utf-8")})
+    agents_dir = src / ".agents"
+    if agents_dir.is_dir():
+        for p in sorted(agents_dir.rglob("*")):
+            if p.is_file():
+                rel = p.relative_to(agents_dir)
+                files.append({"name": f".claude/{rel}", "content": p.read_text(encoding="utf-8", errors="replace")})
+    return files
 
 
 def _find_worker(config: DispatchConfig, name: str) -> WorkerConfig:
@@ -52,11 +73,11 @@ def _find_worker(config: DispatchConfig, name: str) -> WorkerConfig:
     raise HTTPException(404, f"worker not found: {name}")
 
 
-def run_turn(worker_name: str, message: str, session: str | None) -> ChatTurnResult:
+def run_turn(worker_name: str, message: str, session: str | None, debug: bool = False) -> ChatTurnResult:
     config = load_dispatch_config()
     worker = _find_worker(config, worker_name)
     driver = get_driver(worker.type)
-    runtime = _chat_runtime()
+    runtime = _chat_runtime(debug)
     return _run_turn(driver, runtime, worker, message, session, timeout=CHAT_TIMEOUT_SECONDS)
 
 
