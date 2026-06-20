@@ -333,3 +333,23 @@ class ReopenResponse(BaseModel):
     project: ProjectMeta
     fact: Fact
     intent: Intent
+
+
+class SkillInfo(BaseModel):
+    name: str
+    description: str = ""
+    enabled: bool = True
+
+
+class SkillContent(BaseModel):
+    name: str
+    content: str
+
+
+class SkillCreate(BaseModel):
+    name: str
+    content: str
+
+
+class SkillEnable(BaseModel):
+    enabled: bool
