@@ -6,3 +6,6 @@ datas/
 dispatch.yaml
 dispatch.*.yaml
 !dispatch.example.yaml
+
+# generated knowledge graph (local artifact)
+graphify-out/

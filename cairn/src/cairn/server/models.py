@@ -8,6 +8,56 @@ from pydantic import BaseModel, Field, field_validator
 class Settings(BaseModel):
     intent_timeout: int = Field(ge=5)
     reason_timeout: int = Field(ge=5)
+    execution_record_enabled: bool = True
+    execution_file_logging: bool = True
+
+
+class ExecutionReport(BaseModel):
+    phase: str
+    intent_id: str | None = None
+    worker_name: str
+    model: str | None = None
+    command: list[str]
+    prompt: str
+    response_text: str | None = None
+    stdout: str = ""
+    stderr: str = ""
+    exit_code: int | None = None
+    outcome: str
+    started_at: str
+    ended_at: str
+    duration_ms: int = 0
+    produced_fact_id: str | None = None
+    produced_intent_ids: list[str] = Field(default_factory=list)
+
+
+class ExecutionSummary(BaseModel):
+    id: str
+    phase: str
+    intent_id: str | None = None
+    worker_name: str
+    model: str | None = None
+    outcome: str
+    exit_code: int | None = None
+    started_at: str
+    ended_at: str
+    duration_ms: int = 0
+    produced_fact_id: str | None = None
+    produced_intent_ids: list[str] = Field(default_factory=list)
+    has_log: bool = False
+    command_preview: str = ""  # short, redacted preview of the executed command for the Runtime list
+
+
+class ExecutionDetail(ExecutionSummary):
+    command: list[str]
+    prompt: str
+    response_text: str | None = None
+    stdout_inline: str | None = None
+    stderr_inline: str | None = None
+    stdout_bytes: int = 0
+    stderr_bytes: int = 0
+    truncated: bool = False
+    log_path: str | None = None
 
 
 class Fact(BaseModel):

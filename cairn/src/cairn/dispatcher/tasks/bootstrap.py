@@ -15,6 +15,8 @@ from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
+    ExecutionRecorder,
+    model_env_key,
     best_effort_release,
     cancel_reason,
     did_timeout,
@@ -23,7 +25,6 @@ from cairn.dispatcher.tasks.common import (
     run_healthcheck,
     run_worker_process,
     task_healthcheck_enabled,
-    write_conclude_result,
     write_conclude_result_with_fact_id,
 )
 from cairn.dispatcher.workers.registry import get_driver
@@ -42,6 +43,10 @@ def run_bootstrap_task(
     cancellation: TaskCancellation,
 ) -> str:
     driver = get_driver(worker.type)
+    recorder = ExecutionRecorder(
+        client, project.project.id, intent.id, worker.name, worker.env.get(model_env_key(worker))
+    )
+    outcome = "failed"
     task_started = time.perf_counter()
     healthcheck_timeout = config.runtime.healthcheck_timeout
     lease = HeartbeatLease.for_intent(client, project.project.id, intent.id, worker.name, config.runtime.interval)
@@ -76,7 +81,8 @@ def run_bootstrap_task(
                     cancelled,
                 )
                 best_effort_release(client, project.project.id, intent.id, worker.name)
-                return "cancelled"
+                outcome = "cancelled"
+                return outcome
             if lease.failure is not None:
                 LOG.warning(
                     "heartbeat lost during bootstrap healthcheck project=%s intent=%s worker=%s status=%s",
@@ -86,7 +92,8 @@ def run_bootstrap_task(
                     lease.failure.status_code,
                 )
                 best_effort_release(client, project.project.id, intent.id, worker.name)
-                return "failed"
+                outcome = "failed"
+                return outcome
             if healthcheck.result.returncode != 0:
                 LOG.warning(
                     "worker unhealthy project=%s intent=%s worker=%s healthcheck_ms=%s stderr=%s",
@@ -97,7 +104,8 @@ def run_bootstrap_task(
                     preview(healthcheck.result.stderr),
                 )
                 best_effort_release(client, project.project.id, intent.id, worker.name)
-                return "unhealthy"
+                outcome = "unhealthy"
+                return outcome
 
         prompt = render_prompt(
             load_prompt(config.runtime.prompt_group, "bootstrap.md"),
@@ -119,6 +127,7 @@ def run_bootstrap_task(
             cancellation=cancellation,
         )
         execute_ms = int((time.perf_counter() - execute_started) * 1000)
+        recorder.record(phase="bootstrap", command=execute.argv, prompt=prompt, result=first)
         session = driver.extract_session(session, first.stdout, first.stderr)
         cancelled = cancel_reason(first, cancellation)
         if cancelled is not None:
@@ -131,7 +140,8 @@ def run_bootstrap_task(
                 execute_ms,
             )
             best_effort_release(client, project.project.id, intent.id, worker.name)
-            return "cancelled"
+            outcome = "cancelled"
+            return outcome
         if lease.failure is not None:
             LOG.warning(
                 "heartbeat lost during bootstrap project=%s intent=%s worker=%s status=%s execute_ms=%s",
@@ -142,7 +152,8 @@ def run_bootstrap_task(
                 execute_ms,
             )
             best_effort_release(client, project.project.id, intent.id, worker.name)
-            return "failed"
+            outcome = "failed"
+            return outcome
         if not did_timeout(first) and first.returncode == 0:
             try:
                 model_output = driver.extract_response_text(first.stdout, first.stderr)
@@ -160,7 +171,7 @@ def run_bootstrap_task(
                     preview(first.stdout),
                     preview(first.stderr),
                 )
-                return _try_conclude_fallback(
+                outcome = _try_conclude_fallback(
                     config,
                     client,
                     container_manager,
@@ -172,7 +183,9 @@ def run_bootstrap_task(
                     session,
                     lease,
                     cancellation,
+                    recorder,
                 )
+                return outcome
             if kind == "rejected":
                 LOG.warning(
                     "bootstrap rejected project=%s intent=%s worker=%s execute_ms=%s total_ms=%s stdout_preview=%s",
@@ -184,8 +197,9 @@ def run_bootstrap_task(
                     preview(first.stdout),
                 )
                 best_effort_release(client, project.project.id, intent.id, worker.name)
-                return "rejected"
-            return _write_bootstrap_complete_result(
+                outcome = "rejected"
+                return outcome
+            outcome = _write_bootstrap_complete_result(
                 client,
                 project.project.id,
                 intent.id,
@@ -195,7 +209,9 @@ def run_bootstrap_task(
                 source="bootstrap",
                 phase_ms=execute_ms,
                 total_ms=int((time.perf_counter() - task_started) * 1000),
+                recorder=recorder,
             )
+            return outcome
         if did_timeout(first):
             LOG.warning(
                 "bootstrap timed out project=%s intent=%s worker=%s execute_ms=%s total_ms=%s stdout_preview=%s stderr_preview=%s",
@@ -207,7 +223,7 @@ def run_bootstrap_task(
                 preview(first.stdout),
                 preview(first.stderr),
             )
-            return _try_conclude_fallback(
+            outcome = _try_conclude_fallback(
                 config,
                 client,
                 container_manager,
@@ -219,7 +235,9 @@ def run_bootstrap_task(
                 session,
                 lease,
                 cancellation,
+                recorder,
             )
+            return outcome
         LOG.warning(
             "bootstrap command failed project=%s intent=%s worker=%s code=%s execute_ms=%s total_ms=%s stdout_preview=%s stderr_preview=%s",
             project.project.id,
@@ -232,12 +250,15 @@ def run_bootstrap_task(
             preview(first.stderr),
         )
         best_effort_release(client, project.project.id, intent.id, worker.name)
-        return "failed"
+        outcome = "failed"
+        return outcome
     except Exception:
         LOG.exception("bootstrap task crashed project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)
+        outcome = "failed"
         best_effort_release(client, project.project.id, intent.id, worker.name)
-        return "failed"
+        return outcome
     finally:
+        recorder.finish(outcome)
         lease.stop()
 
 
@@ -253,6 +274,7 @@ def _try_conclude_fallback(
     session: str | None,
     lease: HeartbeatLease,
     cancellation: TaskCancellation,
+    recorder: ExecutionRecorder,
 ) -> str:
     if not driver.supports_conclude() or not session:
         LOG.info(
@@ -314,6 +336,7 @@ def _try_conclude_fallback(
         cancellation=cancellation,
     )
     conclude_ms = int((time.perf_counter() - conclude_started) * 1000)
+    recorder.record(phase="conclude", command=conclude_argv, prompt=prompt, result=result)
     cancelled = cancel_reason(result, cancellation)
     if cancelled is not None:
         LOG.info(
@@ -380,7 +403,7 @@ def _try_conclude_fallback(
         )
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "rejected"
-    return write_conclude_result(
+    conclude = write_conclude_result_with_fact_id(
         client,
         project.project.id,
         intent.id,
@@ -389,6 +412,8 @@ def _try_conclude_fallback(
         source="bootstrap_conclude",
         phase_ms=conclude_ms,
     )
+    recorder.set_produced_fact(conclude.fact_id)
+    return conclude.status
 
 
 def _bootstrap_prompt_replacements(project: ProjectDetail) -> dict[str, str]:
@@ -420,6 +445,7 @@ def _write_bootstrap_complete_result(
     source: str,
     phase_ms: int,
     total_ms: int | None = None,
+    recorder: ExecutionRecorder,
 ) -> str:
     conclude = write_conclude_result_with_fact_id(
         client,
@@ -431,6 +457,7 @@ def _write_bootstrap_complete_result(
         phase_ms=phase_ms,
         total_ms=total_ms,
     )
+    recorder.set_produced_fact(conclude.fact_id)
     if conclude.status != "success":
         return "failed"
     if conclude.fact_id is None:

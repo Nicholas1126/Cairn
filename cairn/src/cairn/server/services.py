@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
-from cairn.server.models import Intent, ProjectMeta, ProjectReason
+from cairn.execlog import redact_command, redact_text, truncate_head_tail
+from cairn.server.models import (
+    ExecutionDetail,
+    ExecutionReport,
+    ExecutionSummary,
+    Intent,
+    ProjectMeta,
+    ProjectReason,
+)
 
 def utcnow() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -255,3 +264,119 @@ def expire_reason_leases(conn: sqlite3.Connection, project_id: str | None = None
         query = query.replace("WHERE ", "WHERE id = ? AND ", 1)
         params = (project_id, now, timeout)
     conn.execute(query, params)
+
+
+# ---------------------------------------------------------------------------
+# Execution persistence
+# ---------------------------------------------------------------------------
+
+
+def next_execution_id(conn: sqlite3.Connection, project_id: str) -> str:
+    return _next_scoped_id(conn, "execution", "exec_", project_id)
+
+
+def insert_execution(
+    conn: sqlite3.Connection,
+    project_id: str,
+    report: ExecutionReport,
+    *,
+    inline_limit: int,
+    log_path: str | None = None,
+) -> ExecutionDetail:
+    exec_id = next_execution_id(conn, project_id)
+    command = redact_command(report.command)
+    out = truncate_head_tail(redact_text(report.stdout or ""), inline_limit)
+    err = truncate_head_tail(redact_text(report.stderr or ""), inline_limit)
+    produced_intents = json.dumps(report.produced_intent_ids) if report.produced_intent_ids else None
+    conn.execute(
+        "INSERT INTO executions (id, project_id, phase, intent_id, worker_name, model, "
+        "command, prompt, response_text, stdout_inline, stderr_inline, stdout_bytes, "
+        "stderr_bytes, truncated, exit_code, outcome, started_at, ended_at, duration_ms, "
+        "produced_fact_id, produced_intent_ids, log_path) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            exec_id, project_id, report.phase, report.intent_id, report.worker_name, report.model,
+            json.dumps(command), redact_text(report.prompt),
+            redact_text(report.response_text) if report.response_text else None,
+            out.text, err.text, out.original_bytes, err.original_bytes,
+            1 if (out.truncated or err.truncated) else 0,
+            report.exit_code, report.outcome, report.started_at, report.ended_at,
+            report.duration_ms, report.produced_fact_id, produced_intents, log_path,
+        ),
+    )
+    return _execution_detail_from_row(
+        conn.execute(
+            "SELECT * FROM executions WHERE id = ? AND project_id = ?", (exec_id, project_id)
+        ).fetchone()
+    )
+
+
+def set_execution_log_path(
+    conn: sqlite3.Connection, project_id: str, exec_id: str, log_path: str
+) -> None:
+    conn.execute(
+        "UPDATE executions SET log_path = ? WHERE id = ? AND project_id = ?",
+        (log_path, exec_id, project_id),
+    )
+
+
+def list_executions(conn: sqlite3.Connection, project_id: str) -> list[ExecutionSummary]:
+    rows = conn.execute(
+        "SELECT * FROM executions WHERE project_id = ? ORDER BY started_at, id", (project_id,)
+    ).fetchall()
+    return [_execution_summary_from_row(r) for r in rows]
+
+
+def get_execution(
+    conn: sqlite3.Connection, project_id: str, exec_id: str
+) -> ExecutionDetail:
+    row = conn.execute(
+        "SELECT * FROM executions WHERE id = ? AND project_id = ?", (exec_id, project_id)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Execution not found")
+    return _execution_detail_from_row(row)
+
+
+def _produced_intents(row: sqlite3.Row) -> list[str]:
+    raw = row["produced_intent_ids"]
+    return json.loads(raw) if raw else []
+
+
+_COMMAND_PREVIEW_LIMIT = 8192
+
+
+def _command_preview(row: sqlite3.Row) -> str:
+    try:
+        joined = " ".join(json.loads(row["command"]))
+    except (json.JSONDecodeError, TypeError):
+        return ""
+    if len(joined) > _COMMAND_PREVIEW_LIMIT:
+        return joined[:_COMMAND_PREVIEW_LIMIT] + " …"
+    return joined
+
+
+def _execution_summary_from_row(row: sqlite3.Row) -> ExecutionSummary:
+    return ExecutionSummary(
+        id=row["id"], phase=row["phase"], intent_id=row["intent_id"],
+        worker_name=row["worker_name"], model=row["model"], outcome=row["outcome"],
+        exit_code=row["exit_code"], started_at=row["started_at"], ended_at=row["ended_at"],
+        duration_ms=row["duration_ms"], produced_fact_id=row["produced_fact_id"],
+        produced_intent_ids=_produced_intents(row), has_log=bool(row["log_path"]),
+        command_preview=_command_preview(row),
+    )
+
+
+def _execution_detail_from_row(row: sqlite3.Row) -> ExecutionDetail:
+    return ExecutionDetail(
+        id=row["id"], phase=row["phase"], intent_id=row["intent_id"],
+        worker_name=row["worker_name"], model=row["model"], outcome=row["outcome"],
+        exit_code=row["exit_code"], started_at=row["started_at"], ended_at=row["ended_at"],
+        duration_ms=row["duration_ms"], produced_fact_id=row["produced_fact_id"],
+        produced_intent_ids=_produced_intents(row), has_log=bool(row["log_path"]),
+        command=json.loads(row["command"]), prompt=row["prompt"],
+        response_text=row["response_text"], stdout_inline=row["stdout_inline"],
+        stderr_inline=row["stderr_inline"], stdout_bytes=row["stdout_bytes"],
+        stderr_bytes=row["stderr_bytes"], truncated=bool(row["truncated"]),
+        log_path=row["log_path"],
+    )

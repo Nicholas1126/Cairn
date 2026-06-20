@@ -584,6 +584,8 @@
         </button>
         <button @click="sideTab = 'log'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
           :class="sideTab === 'log' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Log</button>
+        <button @click="sideTab = 'runtime'" class="flex-1 px-3 py-2.5 text-xs font-medium transition"
+          :class="sideTab === 'runtime' ? 'text-brand-600 border-b-2 border-brand-500' : 'text-slate-400 hover:text-slate-600'">Runtime</button>
       </div>
 
       <!-- Detail -->
@@ -783,6 +785,67 @@
                 <p class="text-[11px] text-slate-400 mt-1 break-words" x-text="[entry.actor, ...entry.meta].filter(Boolean).join(' · ')"></p>
               </template>
             </button>
+            <div class="flex flex-col items-center gap-1 shrink-0 pt-0.5" x-show="!replay.active">
+              <button type="button" :title="copiedKey === entry.id ? 'Copied!' : 'Copy text'"
+                @click.stop="copyEntry(entry)"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-md border transition"
+                :class="copiedKey === entry.id ? 'border-teal-300 text-teal-600 bg-teal-50' : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600'">
+                <svg x-show="copiedKey !== entry.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                <svg x-show="copiedKey === entry.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+              </button>
+              <button type="button"
+                :title="executionForResult(entry) ? 'View execution detail' : 'No execution record'"
+                :disabled="!executionForResult(entry)"
+                @click.stop="openExecutionForEntry(entry)"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-md border transition"
+                :class="executionForResult(entry) ? 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600' : 'border-slate-100 text-slate-200 cursor-not-allowed'">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Runtime -->
+      <div x-show="sideTab === 'runtime'" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <template x-if="executions.some(e => e.has_log)">
+          <div class="flex justify-end">
+            <a :href="`/projects/${project.project.id}/executions/logs.zip`"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">
+              Download all (zip)
+            </a>
+          </div>
+        </template>
+        <template x-if="executions.length === 0">
+          <p class="text-sm text-slate-300 text-center mt-12">No execution records yet</p>
+        </template>
+        <template x-for="e in executions" :key="e.id">
+          <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-600" x-text="e.phase"></span>
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide"
+                    :class="e.outcome === 'success' ? 'bg-teal-50 text-teal-700' : 'bg-rose-50 text-rose-600'"
+                    x-text="e.outcome"></span>
+                </div>
+                <span class="text-[11px] text-slate-400 shrink-0 tabular-nums" x-text="formatTime(e.started_at)"></span>
+              </div>
+            </div>
+            <div class="p-4 space-y-3">
+              <p class="text-[11px] text-slate-400 break-words" x-text="[e.worker_name, e.model].filter(Boolean).join(' · ') || '—'"></p>
+              <template x-if="e.command_preview">
+                <pre class="text-[11px] font-mono text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-2.5 max-h-40 overflow-auto whitespace-pre-wrap break-words" x-text="e.command_preview"></pre>
+              </template>
+              <div class="flex items-center gap-2">
+                <button type="button" @click="openExecutionDetail(e.id)"
+                  class="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">Detail</button>
+                <template x-if="e.has_log">
+                  <a :href="`/projects/${project.project.id}/executions/${e.id}/log`"
+                    class="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">Download</a>
+                </template>
+              </div>
+            </div>
           </div>
         </template>
       </div>
@@ -792,6 +855,59 @@
 </template>
 
 <!-- ═══════════ MODALS ═══════════ -->
+
+<!-- Execution Detail -->
+<div x-show="showExecutionModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showExecutionModal = false">
+  <template x-if="executionDetail">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 border border-slate-200/60 overflow-hidden flex flex-col max-h-[85vh]" @click.stop>
+      <div class="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-600" x-text="executionDetail.phase"></span>
+          <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide"
+            :class="executionDetail.outcome === 'success' ? 'bg-teal-50 text-teal-700' : 'bg-rose-50 text-rose-600'"
+            x-text="executionDetail.outcome"></span>
+          <span class="text-xs text-slate-400 truncate" x-text="[executionDetail.worker_name, executionDetail.model].filter(Boolean).join(' · ')"></span>
+        </div>
+        <button @click="showExecutionModal = false" class="text-slate-400 hover:text-slate-600 transition text-sm shrink-0">Close</button>
+      </div>
+      <div class="p-5 space-y-4 overflow-y-auto text-xs">
+        <template x-if="executionDetail.command && executionDetail.command.length">
+          <div class="space-y-1">
+            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Command</p>
+            <pre class="whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700 bg-slate-50 rounded-lg p-3" x-text="executionDetail.command.join(' ')"></pre>
+          </div>
+        </template>
+        <template x-if="executionDetail.prompt">
+          <div class="space-y-1">
+            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Prompt</p>
+            <pre class="whitespace-pre-wrap break-words text-[11px] text-slate-700 bg-slate-50 rounded-lg p-3" x-text="executionDetail.prompt"></pre>
+          </div>
+        </template>
+        <template x-if="executionDetail.stdout_inline">
+          <div class="space-y-1">
+            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Stdout</p>
+            <pre class="whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700 bg-slate-50 rounded-lg p-3" x-text="executionDetail.stdout_inline"></pre>
+          </div>
+        </template>
+        <template x-if="executionDetail.stderr_inline">
+          <div class="space-y-1">
+            <p class="text-[10px] font-semibold text-rose-500 uppercase tracking-widest">Stderr</p>
+            <pre class="whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700 bg-rose-50/60 rounded-lg p-3" x-text="executionDetail.stderr_inline"></pre>
+          </div>
+        </template>
+        <template x-if="executionDetail.truncated">
+          <p class="text-[11px] text-amber-600" x-text="`truncated — original ${executionDetail.stdout_bytes + executionDetail.stderr_bytes} bytes`"></p>
+        </template>
+        <template x-if="executionDetail.has_log">
+          <div class="pt-2">
+            <a :href="`/projects/${project.project.id}/executions/${executionDetail.id}/log`"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">Download full log</a>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
+</div>
 
 <!-- New Project -->
 <div x-show="showNewProject" x-cloak class="fixed inset-0 z-50 flex items-center justify-center overlay" @click.self="showNewProject = false">
@@ -998,6 +1114,16 @@
       <input type="number" x-model.number="settingsForm.reason_timeout" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition">
       <p class="text-[11px] text-slate-400 mt-2">Shared backend configuration.</p>
     </div>
+    <div class="mt-4 space-y-2.5 pt-4 border-t border-slate-100">
+      <label class="flex items-center justify-between gap-3 text-xs">
+        <span class="text-slate-500">Execution records (Runtime tab)</span>
+        <input type="checkbox" x-model="settingsForm.execution_record_enabled" @change="saveExecutionToggles()">
+      </label>
+      <label class="flex items-center justify-between gap-3 text-xs">
+        <span class="text-slate-500">Full .log file logging (disk)</span>
+        <input type="checkbox" x-model="settingsForm.execution_file_logging" @change="saveExecutionToggles()">
+      </label>
+    </div>
     <div class="flex justify-end gap-2 mt-5">
       <button @click="showSettings = false" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 rounded-xl transition">Close</button>
       <button @click="saveServerSettings()" class="px-4 py-2 text-sm bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 transition shadow-sm shadow-brand-200">Save Server</button>
@@ -1109,7 +1235,11 @@ function cairnApp() {
     reopenForm: { projectId: '', projectTitle: '', description: '' },
     renameForm: { projectId: '', originalTitle: '', title: '' },
     localPrefs: { actor_name: 'Human', layout_mode: 'dagre_tb' },
-    settingsForm: { intent_timeout: 5, reason_timeout: 5 },
+    settingsForm: { intent_timeout: 5, reason_timeout: 5, execution_record_enabled: true, execution_file_logging: true },
+    executions: [],
+    executionDetail: null,
+    showExecutionModal: false,
+    copiedKey: null,
     deleteConfirm: { id: '', title: '' },
     isDeletingProject: false,
     yamlPreviewTitle: '',
@@ -1581,11 +1711,52 @@ function cairnApp() {
         const s = await this.api('GET', '/settings');
         this.settingsForm.intent_timeout = s.intent_timeout;
         this.settingsForm.reason_timeout = s.reason_timeout;
+        this.settingsForm.execution_record_enabled = s.execution_record_enabled;
+        this.settingsForm.execution_file_logging = s.execution_file_logging;
       } catch(e) { console.error(e); }
     },
 
     async loadProject(id) {
       try { this.project = await this.api('GET', `/projects/${id}`); } catch(e) { this.showToast(e.message, 'error'); }
+      await this.loadExecutions();
+    },
+
+    async loadExecutions() {
+      if (!this.project) return;
+      try {
+        const r = await fetch(`/projects/${this.project.project.id}/executions`);
+        if (r.ok) this.executions = await r.json();
+      } catch (e) {}
+    },
+
+    async openExecutionDetail(id) {
+      try {
+        const r = await fetch(`/projects/${this.project.project.id}/executions/${id}`);
+        if (r.ok) { this.executionDetail = await r.json(); this.showExecutionModal = true; }
+      } catch (e) {}
+    },
+
+    executionForResult(entry) {
+      if (!entry) return null;
+      if (entry.type === 'intent_declared') {
+        return this.executions.find(e => (e.produced_intent_ids || []).includes(entry.intentId)) || null;
+      }
+      // intent_concluded / project_completed: the successful execution whose intent produced this fact.
+      if (entry.intentId) {
+        return this.executions.find(e => e.intent_id === entry.intentId && e.outcome === 'success') || null;
+      }
+      return null;
+    },
+
+    openExecutionForEntry(entry) {
+      const ex = this.executionForResult(entry);
+      if (ex) this.openExecutionDetail(ex.id);
+    },
+
+    async copyEntry(entry) {
+      try { await navigator.clipboard.writeText(entry.title || ''); } catch (e) {}
+      this.copiedKey = entry.id;
+      setTimeout(() => { if (this.copiedKey === entry.id) this.copiedKey = null; }, 1500);
     },
 
     async toggleProjectStop() {
@@ -3247,7 +3418,7 @@ function cairnApp() {
       }
     },
 
-    formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); },
+    formatTime(ts) { if (!ts) return ''; const d = new Date(ts); if (isNaN(d)) return ts; return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); },
     formatDate(ts) { if (!ts) return ''; const d = new Date(ts); return d.toLocaleDateString([],{year:'numeric',month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); },
     formatTimelineDate(ts) { if (!ts) return ''; return new Date(ts).toLocaleDateString([],{year:'numeric',month:'short',day:'numeric'}); },
     formatDurationMs(ms) {
@@ -3396,6 +3567,13 @@ function cairnApp() {
       try {
         await this.api('PUT', '/settings', this.settingsForm);
         this.showSettings = false;
+        this.showToast('Server settings saved');
+      } catch(e) { this.showToast(e.message, 'error'); }
+    },
+
+    async saveExecutionToggles() {
+      try {
+        await this.api('PUT', '/settings', this.settingsForm);
         this.showToast('Server settings saved');
       } catch(e) { this.showToast(e.message, 'error'); }
     },

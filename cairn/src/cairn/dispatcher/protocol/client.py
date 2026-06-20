@@ -128,6 +128,9 @@ class CairnClient:
             json={"from": from_ids, "description": description, "creator": creator, "worker": None},
         )
 
+    def report_execution(self, project_id: str, payload: dict[str, Any]) -> ApiResult:
+        return self._request_json("POST", f"/projects/{project_id}/executions", json=payload)
+
     def _request_json(self, method: str, path: str, json: dict[str, Any]) -> ApiResult:
         try:
             response = self._session().request(

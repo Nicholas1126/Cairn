@@ -11,12 +11,90 @@ from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.runtime.process import ProcessResult
+from cairn.execlog import redact_command, redact_text, truncate_head_tail
 
 HEALTHCHECK_COMMUNICATE_GRACE_SECONDS = 10
 PROCESS_COMMUNICATE_GRACE_SECONDS = 15
 LOG_PREVIEW_LIMIT = 1200
 GRAPH_SNAPSHOT_ROOT = "/tmp/cairn-prompts"
+FILE_SHIP_CAP = 10_000_000   # ship at most ~10MB when files are on (server caps file too)
+NOFILE_SHIP_CAP = 64 * 1024  # ship only inline-sized output when files are off
 LOG = logging.getLogger(__name__)
+
+
+def utcnow_iso() -> str:
+    # ISO 8601 (matches the server's utcnow) so the browser's `new Date()` can parse it.
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def model_env_key(worker) -> str:
+    return {"opencode": "OPENCODE_MODEL", "pi": "PI_MODEL",
+            "claudecode": "ANTHROPIC_MODEL", "codex": "CODEX_MODEL"}.get(worker.type, "MODEL")
+
+
+class ExecutionRecorder:
+    """Accumulates the decisive worker process for one task and reports it once."""
+
+    def __init__(self, client, project_id: str, intent_id: str | None,
+                 worker_name: str, model: str | None):
+        self._client = client
+        self._project_id = project_id
+        self._intent_id = intent_id
+        self._worker_name = worker_name
+        self._model = model
+        self._pending: dict | None = None
+        self._started_at = utcnow_iso()
+        self._started_perf = time.perf_counter()
+        self._produced_fact_id: str | None = None
+        self._produced_intent_ids: list[str] = []
+
+    def record(self, *, phase: str, command: list[str], prompt: str, result) -> None:
+        """Capture a worker process for this task. Called after each worker run;
+        the LAST call wins — i.e., the decisive process is reported. In a
+        conclude-fallback path the conclude process (phase="conclude")
+        intentionally overwrites the earlier execute process."""
+        self._pending = {"phase": phase, "command": list(command), "prompt": prompt,
+                         "stdout": result.stdout or "", "stderr": result.stderr or "",
+                         "exit_code": result.returncode}
+
+    def set_produced_fact(self, fact_id: str | None) -> None:
+        if fact_id:
+            self._produced_fact_id = fact_id
+
+    def add_produced_intent(self, intent_id: str | None) -> None:
+        if intent_id:
+            self._produced_intent_ids.append(intent_id)
+
+    def finish(self, outcome: str) -> None:
+        if self._pending is None:
+            return
+        try:
+            settings = self._client.get_settings()
+        except Exception:  # never let logging break the task
+            return
+        if not settings.execution_record_enabled:
+            return
+        cap = FILE_SHIP_CAP if settings.execution_file_logging else NOFILE_SHIP_CAP
+        out = truncate_head_tail(redact_text(self._pending["stdout"]), cap)
+        err = truncate_head_tail(redact_text(self._pending["stderr"]), cap)
+        payload = {
+            "phase": self._pending["phase"], "intent_id": self._intent_id,
+            "worker_name": self._worker_name, "model": self._model,
+            "command": redact_command(self._pending["command"]),
+            "prompt": redact_text(self._pending["prompt"]),
+            "stdout": out.text, "stderr": err.text,
+            "exit_code": self._pending["exit_code"], "outcome": outcome,
+            "started_at": self._started_at, "ended_at": utcnow_iso(),
+            "duration_ms": int((time.perf_counter() - self._started_perf) * 1000),
+            "produced_fact_id": self._produced_fact_id,
+            "produced_intent_ids": self._produced_intent_ids,
+        }
+        try:
+            self._client.report_execution(self._project_id, payload)
+        except Exception:
+            LOG.warning("execution report failed project=%s intent=%s",
+                        self._project_id, self._intent_id)
 
 
 @dataclass(slots=True)

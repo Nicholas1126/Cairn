@@ -598,6 +598,46 @@ if running_project_count < runtime.max_running_projects:
 
 ---
 
+## 执行记录上报
+
+### 概述
+
+每次任务运行结束后，Dispatcher 会通过 `POST /projects/{project_id}/executions` 上报一条执行记录。上报逻辑封装在 `ExecutionRecorder`（`cairn/src/cairn/dispatcher/tasks/common.py`），并在 `bootstrap`、`reason`、`explore` 三类任务的收尾路径中统一调用。
+
+上报只针对**决定性进程**：
+
+- 对于进入 conclude fallback 的任务（`bootstrap_conclude` / `explore_conclude`），上报 conclude 阶段的进程；
+- 其他情况上报 execute 阶段的进程。
+
+上报的 `phase` 取值为 `bootstrap`、`reason`、`explore`、`conclude` 之一。
+
+### 脱密与截断
+
+上报前 `ExecutionRecorder` 会对命令数组、prompt 和输出做预处理：
+
+- **脱密**：替换命令、prompt 和输出中匹配 `apiKey`、`token`、`Bearer` 的敏感字段；
+- **截断**：
+  - 当 `execution_file_logging=true` 时，行内输出截断至 64KB（头尾各半），同时将完整输出（最多约 10MB）随记录一起发往服务端，服务端负责写入磁盘日志；
+  - 当 `execution_file_logging=false` 时，仅上报 64KB 行内截断输出，不附带完整内容。
+
+### 开关控制
+
+上报前，Dispatcher 通过 `CairnClient.get_settings()` 读取服务端配置：
+
+- 若 `execution_record_enabled=false`，则跳过整个上报流程，不发起请求；
+- 服务端在 `execution_record_enabled=false` 时也会返回 `204`，作为双重保障。
+
+### 产出 id
+
+- `produced_fact_id`：由 conclude 阶段调用 `POST /intents/{id}/conclude` 写回成功后填入；
+- `produced_intent_ids`：由 reason 阶段调用 `POST /intents` 写回成功后填入（可为空数组）。
+
+### 失败处理
+
+执行记录上报失败（网络错误、服务端异常等）不会中断任务：异常会被捕获并记录日志，当前任务的正常收尾流程不受影响。
+
+---
+
 ## Worker 配置
 
 ### 字段定义

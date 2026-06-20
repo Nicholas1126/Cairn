@@ -82,6 +82,9 @@ class InProcessClient:
             {"from": from_ids, "description": description, "creator": creator, "worker": None},
         )
 
+    def report_execution(self, project_id: str, payload: dict[str, Any]) -> ApiResult:
+        return self._post(f"/projects/{project_id}/executions", payload)
+
     def _post(self, path: str, payload: dict[str, Any]) -> ApiResult:
         response = self.http.post(path, json=payload)
         data = response.json() if response.headers.get("content-type", "").startswith("application/json") else None
@@ -347,6 +350,13 @@ def test_mock_scheduler_runs_reason_explore_reason_complete_chain(http_client: T
     ]
     assert any("/reason_execute-" in path and "f002" in content for _, path, content in containers.writes)
     assert any("/explore_execute-" in path and "f001" in content for _, path, content in containers.writes)
+
+    execs_response = http_client.get(f"/projects/{project_id}/executions")
+    assert execs_response.status_code == 200
+    execs = execs_response.json()
+    assert len(execs) >= 1
+    assert any(e["outcome"] == "success" for e in execs)
+    assert {"reason", "explore"} <= {e["phase"] for e in execs}
 
 
 def test_mock_scheduler_enabled_project_skips_bootstrap_when_worker_does_not_support_it(

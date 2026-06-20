@@ -79,6 +79,32 @@ CREATE TABLE IF NOT EXISTS scoped_counters (
     value INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, kind)
 );
+
+CREATE TABLE IF NOT EXISTS executions (
+    id TEXT NOT NULL,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    phase TEXT NOT NULL,
+    intent_id TEXT,
+    worker_name TEXT NOT NULL,
+    model TEXT,
+    command TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    response_text TEXT,
+    stdout_inline TEXT,
+    stderr_inline TEXT,
+    stdout_bytes INTEGER NOT NULL DEFAULT 0,
+    stderr_bytes INTEGER NOT NULL DEFAULT 0,
+    truncated INTEGER NOT NULL DEFAULT 0,
+    exit_code INTEGER,
+    outcome TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    produced_fact_id TEXT,
+    produced_intent_ids TEXT,
+    log_path TEXT,
+    PRIMARY KEY (id, project_id)
+);
 """
 
 
@@ -91,6 +117,20 @@ def configure(path: Path) -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
         _ensure_project_columns(conn)
+        _ensure_settings_columns(conn)
+
+
+def _ensure_settings_columns(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(settings)")}
+    if "execution_record_enabled" not in columns:
+        conn.execute("ALTER TABLE settings ADD COLUMN execution_record_enabled INTEGER NOT NULL DEFAULT 1")
+    if "execution_file_logging" not in columns:
+        conn.execute("ALTER TABLE settings ADD COLUMN execution_file_logging INTEGER NOT NULL DEFAULT 1")
+
+
+def executions_root() -> Path:
+    assert _db_path is not None
+    return _db_path.parent / "executions"
 
 
 def _ensure_project_columns(conn: sqlite3.Connection) -> None:
