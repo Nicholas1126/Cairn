@@ -571,6 +571,34 @@
         <span x-text="chatSending ? 'Sending…' : 'Send'"></span>
       </button>
     </div>
+    <div class="max-w-3xl mx-auto mt-2 flex items-center gap-2">
+      <button type="button" @click="toggleChatDebug()"
+        :class="chatDebug ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-slate-500 border-slate-200'"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition"
+        :title="chatDebug ? 'Debug: worker-like context (seeded)' : 'Chat: bare context'">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.2 4.2l4.3 4.3m7 7 4.3 4.3M1 12h6m10 0h6M4.2 19.8l4.3-4.3m7-7 4.3-4.3"/></svg>
+        <span x-text="chatDebug ? 'Debug ON' : 'Debug OFF'"></span>
+      </button>
+      <button type="button" x-show="chatDebug" @click="chatContextOpen = !chatContextOpen"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        <span x-text="(chatContextOpen ? 'Hide' : 'Active') + ' worker context (' + chatContext.length + ')'"></span>
+      </button>
+    </div>
+    <template x-if="chatDebug && chatContextOpen">
+      <div class="max-w-3xl mx-auto mt-2 bg-slate-50 border border-slate-200/60 rounded-xl p-3 space-y-3">
+        <div class="text-[11px] text-slate-400">Active worker context (seeded for debug) · <span x-text="chatContext.length + ' file' + (chatContext.length === 1 ? '' : 's')"></span></div>
+        <template x-if="chatContext.length === 0">
+          <div class="text-[11px] text-slate-400">No context files.</div>
+        </template>
+        <template x-for="f in chatContext" :key="f.name">
+          <div>
+            <div class="text-[11px] font-mono text-slate-500 mb-1" x-text="f.name"></div>
+            <pre class="bg-white border border-slate-200/60 rounded-lg p-2 max-h-64 overflow-auto text-[11px] font-mono whitespace-pre-wrap break-words text-slate-600" x-text="f.content"></pre>
+          </div>
+        </template>
+      </div>
+    </template>
   </div>
 </div>
 
@@ -1459,6 +1487,9 @@ function cairnApp() {
     chatInput: '',
     chatSending: false,
     chatError: '',
+    chatDebug: false,
+    chatContext: [],
+    chatContextOpen: false,
 
     async init() {
       this._panelResizeMove = (e) => this.onPanelResize(e);
@@ -1508,6 +1539,14 @@ function cairnApp() {
       } catch (e) { this.chatError = 'Failed to load workers.'; }
     },
     newChat() { this.chatMessages = []; this.chatSession = null; },
+    toggleChatDebug() {
+      this.chatDebug = !this.chatDebug;
+      this.newChat();                 // reset conversation/session on mode switch
+      if (this.chatDebug && this.chatContext.length === 0) this.loadChatContext();
+    },
+    async loadChatContext() {
+      try { const r = await fetch('/chat/context'); if (r.ok) this.chatContext = (await r.json()).files || []; } catch (e) {}
+    },
     async sendChat() {
       const msg = (this.chatInput || '').trim();
       if (!msg || !this.chatWorker || this.chatSending) return;
@@ -1515,7 +1554,7 @@ function cairnApp() {
       this.chatInput = ''; this.chatSending = true;
       try {
         const r = await fetch('/chat/turn', { method: 'POST', headers: {'content-type':'application/json'},
-          body: JSON.stringify({ worker: this.chatWorker, message: msg, session: this.chatSession }) });
+          body: JSON.stringify({ worker: this.chatWorker, message: msg, session: this.chatSession, debug: this.chatDebug }) });
         if (r.ok) {
           const t = await r.json();
           this.chatSession = t.session || this.chatSession;
