@@ -30,6 +30,9 @@ class ContainerManager:
     def close(self) -> None:
         self._client.close()
 
+    def snapshot_root(self) -> str:
+        return "/tmp/cairn-prompts"
+
     def container_name(self, project_id: str) -> str:
         sanitized = project_id.replace("/", "-")
         return f"{self._PREFIX}{sanitized}"

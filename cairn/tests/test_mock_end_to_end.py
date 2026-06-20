@@ -167,6 +167,9 @@ class LocalContainerManager:
     def write_text_file(self, container_name: str, path: str, content: str) -> None:
         self.writes.append((container_name, path, content))
 
+    def snapshot_root(self) -> str:
+        return "/tmp/cairn-prompts"
+
     def needs_completed_cleanup(self, _project_id: str) -> bool:
         return False
 
