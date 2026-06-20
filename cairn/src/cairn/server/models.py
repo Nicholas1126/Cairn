@@ -60,6 +60,21 @@ class ExecutionDetail(ExecutionSummary):
     log_path: str | None = None
 
 
+class EngineOverride(BaseModel):
+    path: str
+    launcher: Literal["direct", "cmd", "powershell"] = "direct"
+
+
+class EngineInfo(BaseModel):
+    type: str
+    binary: str
+    launchable: bool
+    path: str | None = None
+    version: str | None = None
+    source: str | None = None
+    override: EngineOverride | None = None
+
+
 class Fact(BaseModel):
     id: str
     description: str
