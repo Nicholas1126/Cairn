@@ -160,6 +160,12 @@ class ContainerConfig(BaseModel):
     cap_add: list[str] = Field(default_factory=list)
 
 
+class LocalConfig(BaseModel):
+    workspaces_root: str = "~/.cairn/workspaces"
+    completed_action: CompletedAction = "stop"
+    engines_config: str = "~/.cairn/engines.json"
+
+
 class RuntimeConfig(BaseModel):
     max_workers: int = Field(gt=0)
     max_running_projects: int = Field(gt=0)
@@ -209,6 +215,7 @@ class DispatchConfig(BaseModel):
     runtime: RuntimeConfig
     tasks: TasksConfig
     container: ContainerConfig
+    local: LocalConfig = Field(default_factory=LocalConfig)
     common_env: dict[str, str] = Field(default_factory=dict)
     workers: list[WorkerConfig]
 

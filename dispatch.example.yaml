@@ -51,6 +51,13 @@ container:
   #   - "NET_RAW"
   #   - "NET_ADMIN"
 
+# Optional: host (Local Engine) backend settings. Used by projects created with
+# backend=local. Agents must be installed on the host.
+# local:
+#   workspaces_root: "~/.cairn/workspaces"
+#   completed_action: stop      # remove | stop
+#   engines_config: "~/.cairn/engines.json"   # optional explicit binary overrides
+
 
 workers:
   # Worker priority is ascending: lower numbers are preferred first.
