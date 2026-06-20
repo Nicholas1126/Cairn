@@ -565,11 +565,16 @@
   <div class="border-t border-slate-200/60 bg-white/80 backdrop-blur px-4 py-3 shrink-0">
     <div class="max-w-3xl mx-auto">
       <div class="border border-slate-200 rounded-2xl bg-white shadow-sm focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300 transition flex flex-col overflow-hidden">
+        <div class="h-2.5 shrink-0 flex items-center justify-center cursor-ns-resize group select-none"
+             @mousedown="startComposerResize($event)" title="拖动上边沿调整高度">
+          <div class="w-10 h-1 rounded-full bg-slate-200 group-hover:bg-slate-400 transition"></div>
+        </div>
         <textarea x-model="chatInput"
-          rows="3"
+          rows="1"
           placeholder="Message the worker..."
           @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); sendChat(); }"
-          class="w-full resize-y min-h-[80px] max-h-[420px] px-4 py-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-sm text-slate-700 placeholder:text-slate-300"></textarea>
+          :style="'height:' + composerHeight + 'px'"
+          class="w-full resize-none overflow-y-auto px-4 py-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-sm text-slate-700 placeholder:text-slate-300"></textarea>
         <div class="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-100 bg-slate-50/40">
           <button type="button" @click="toggleChatDebug()"
             :class="chatDebug ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-slate-500 border-slate-200'"
@@ -1474,6 +1479,7 @@ function cairnApp() {
     chatSending: false,
     chatError: '',
     chatDebug: false,
+    composerHeight: 120,
 
     async init() {
       this._panelResizeMove = (e) => this.onPanelResize(e);
@@ -1526,6 +1532,23 @@ function cairnApp() {
     toggleChatDebug() {
       this.chatDebug = !this.chatDebug;
       this.newChat();                 // reset conversation/session on mode switch
+    },
+    startComposerResize(e) {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = this.composerHeight;
+      const onMove = (ev) => {
+        const delta = startY - ev.clientY;        // drag UP => taller
+        this.composerHeight = Math.min(600, Math.max(60, startH + delta));
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.userSelect = '';
+      };
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     },
     async sendChat() {
       const msg = (this.chatInput || '').trim();
