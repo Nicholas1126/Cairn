@@ -20,17 +20,43 @@ class Resolved:
     source: str    # "override" | "path"
 
 
-def _engines_config_path() -> Path:
+def engines_config_path() -> Path:
     override = os.environ.get("CAIRN_HOME")
     base = Path(override).expanduser() if override else Path.home() / ".cairn"
     return base / "engines.json"
 
 
-def _load_overrides() -> dict:
+def load_overrides() -> dict:
     try:
-        return json.loads(_engines_config_path().read_text(encoding="utf-8"))
+        return json.loads(engines_config_path().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def _write_overrides(data: dict) -> None:
+    path = engines_config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def set_override(worker_type: str, path: str, launcher: str) -> None:
+    data = load_overrides()
+    data[worker_type] = {"path": path, "launcher": launcher}
+    _write_overrides(data)
+
+
+def remove_override(worker_type: str) -> None:
+    data = load_overrides()
+    if worker_type in data:
+        del data[worker_type]
+        _write_overrides(data)
+
+
+# Back-compat private aliases
+_engines_config_path = engines_config_path
+_load_overrides = load_overrides
 
 
 def _augmented_dirs() -> list[str]:
@@ -73,7 +99,7 @@ def _windows_candidates(name: str) -> list[str]:
 
 def resolve_engine(worker_type: str) -> Resolved | None:
     binary = BINARY.get(worker_type, worker_type)
-    overrides = _load_overrides()
+    overrides = load_overrides()
     ov = overrides.get(worker_type) or overrides.get(binary)
     if isinstance(ov, dict) and ov.get("path"):
         path = ov["path"]
