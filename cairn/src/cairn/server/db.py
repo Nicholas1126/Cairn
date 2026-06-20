@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-DEFAULT_DB = Path.home() / ".local" / "share" / "cairn" / "cairn.db"
+
+def cairn_home() -> Path:
+    override = os.environ.get("CAIRN_HOME")
+    return Path(override).expanduser() if override else Path.home() / ".cairn"
+
+
+def default_db() -> Path:
+    return cairn_home() / "cairn.db"
+
+
+# Backwards-compatible module attribute used by app.py / cli.py defaults.
+DEFAULT_DB = default_db()
 
 _db_path: Path | None = None
 
