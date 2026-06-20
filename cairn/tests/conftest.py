@@ -106,6 +106,9 @@ class FakeContainerManager:
     def write_text_file(self, container_name: str, path: str, content: str) -> None:
         self.writes.append((container_name, path, content))
 
+    def snapshot_root(self) -> str:
+        return "/tmp/cairn-prompts"
+
 
 @dataclass
 class FakeClient:

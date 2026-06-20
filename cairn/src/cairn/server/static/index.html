@@ -271,6 +271,14 @@
       </button>
     </div>
     <div class="flex items-center gap-1.5 ml-1">
+      <button @click="location.hash = '/engines'" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5 shrink-0" title="Engine management">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07-1.41 1.41M7.34 16.66l-1.41 1.41m12.14 0-1.41-1.41M7.34 7.34 5.93 5.93"/><circle cx="12" cy="12" r="3.5"/></svg>
+        Engines
+      </button>
+      <button @click="location.hash = '/chat'" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5 shrink-0" title="Engine chat / debug">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        Chat
+      </button>
       <button @click="showLocalPrefs = true" class="h-7 max-w-40 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
         <span class="truncate block" x-text="actorName()"></span>
       </button>
@@ -350,6 +358,12 @@
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z"/></svg>
               <span x-text="p.hint_count"></span>
             </span>
+            <span class="flex items-center gap-1"
+              :class="p.backend === 'local' ? 'text-brand-600' : 'text-slate-400'"
+              :title="p.backend === 'local' ? 'Local Engine (host)' : 'Docker container'">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>
+              <span x-text="p.backend"></span>
+            </span>
           </div>
           <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-400">
             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M8 2v3M16 2v3"/><path d="M3.5 9.5h17"/><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 13h3M8 16h6"/></svg>
@@ -389,6 +403,192 @@
           </div>
         </div>
       </template>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ENGINES VIEW ═══════════ -->
+<div x-show="view === 'engines'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+  <header class="bg-white/80 backdrop-blur border-b border-slate-200/60 px-4 py-2.5 flex items-center gap-3 shrink-0">
+    <button @click="location.hash = '/'" class="p-1.5 rounded-lg hover:bg-slate-100 transition text-slate-400 hover:text-slate-600" title="Back to projects">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <span class="font-semibold text-slate-700 tracking-tight">Engines</span>
+    <div class="flex-1"></div>
+    <button @click="loadEngines()" :disabled="enginesLoading" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed">
+      <svg class="w-3.5 h-3.5" :class="enginesLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      <span x-text="enginesLoading ? 'Refreshing...' : 'Refresh'"></span>
+    </button>
+  </header>
+
+  <div class="flex-1 overflow-y-auto p-4">
+    <div class="max-w-3xl mx-auto">
+      <p class="text-[11px] text-slate-400 mb-4">Reflects agents available on the server host (Local mode).</p>
+
+      <div class="space-y-3">
+        <template x-for="e in engines" :key="e.type">
+          <div class="bg-white rounded-2xl border border-slate-200/60 p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[15px] font-semibold text-slate-700" x-text="e.type"></span>
+                  <span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-[0.12em]"
+                    :class="e.launchable ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-slate-100 text-slate-500 border border-slate-200'"
+                    x-text="e.launchable ? 'available' : 'not found'"></span>
+                  <span class="text-[11px] text-slate-400" x-text="e.binary"></span>
+                </div>
+                <div class="mt-2 space-y-1 text-[11px] text-slate-400">
+                  <template x-if="e.version">
+                    <div>version <span class="text-slate-600" x-text="e.version"></span></div>
+                  </template>
+                  <template x-if="e.path">
+                    <div class="font-mono text-slate-500 break-all" x-text="e.path"></div>
+                  </template>
+                  <template x-if="e.source">
+                    <div>source <span class="text-slate-500" x-text="e.source"></span><template x-if="e.override"><span class="ml-1 text-amber-600">(override)</span></template></div>
+                  </template>
+                </div>
+              </div>
+              <button @click="toggleEngineEdit(e)" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
+                Override
+              </button>
+            </div>
+
+            <template x-if="engineEdit[e.type] && engineEdit[e.type].open">
+              <div class="mt-4 pt-4 border-t border-slate-100 space-y-2.5">
+                <input type="text" x-model="engineEdit[e.type].path" placeholder="/abs/path/to/binary"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 font-mono">
+                <div class="flex items-center gap-2">
+                  <select x-model="engineEdit[e.type].launcher" class="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400">
+                    <option value="direct">direct</option>
+                    <option value="cmd">cmd</option>
+                    <option value="powershell">powershell</option>
+                  </select>
+                  <div class="flex-1"></div>
+                  <template x-if="e.override">
+                    <button @click="clearEngineOverride(e.type)" class="h-9 px-3 rounded-xl border border-rose-200 text-xs text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition inline-flex items-center">
+                      Clear override
+                    </button>
+                  </template>
+                  <button @click="saveEngineOverride(e.type)" class="h-9 px-3 rounded-xl border border-brand-200 text-xs text-brand-600 hover:bg-brand-50 transition inline-flex items-center">
+                    Save
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <template x-if="!enginesLoading && engines.length === 0">
+          <div class="text-center text-sm text-slate-400 py-10">No engines reported.</div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ CHAT VIEW ═══════════ -->
+<div x-show="view === 'chat'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+  <header class="bg-white/80 backdrop-blur border-b border-slate-200/60 px-4 py-2.5 flex items-center gap-3 shrink-0">
+    <button @click="location.hash = '/'" class="p-1.5 rounded-lg hover:bg-slate-100 transition text-slate-400 hover:text-slate-600" title="Back to projects">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <span class="font-semibold text-slate-700 tracking-tight">Chat</span>
+    <select x-model="chatWorker" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 max-w-64">
+      <template x-for="w in chatWorkers" :key="w.name">
+        <option :value="w.name" x-text="w.name + ' · ' + w.model"></option>
+      </template>
+    </select>
+    <div class="flex-1"></div>
+    <button @click="newChat()" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5 shrink-0">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      New chat
+    </button>
+  </header>
+
+  <div class="px-4 pt-2 shrink-0" x-show="chatError" x-cloak>
+    <div class="max-w-3xl mx-auto text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2" x-text="chatError"></div>
+  </div>
+
+  <div class="flex-1 overflow-y-auto p-4">
+    <div class="max-w-3xl mx-auto space-y-3">
+      <template x-if="chatMessages.length === 0">
+        <div class="text-center text-sm text-slate-400 py-10">Pick a worker and send a message.</div>
+      </template>
+      <template x-for="(m, i) in chatMessages" :key="i">
+        <div :class="m.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+          <div class="max-w-[85%]">
+            <div class="rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap break-words"
+              :class="m.role === 'user' ? 'bg-brand-600 text-white' : (m.debug && m.debug.outcome !== 'success' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-white text-slate-700 border border-slate-200/60')"
+              x-text="m.text"></div>
+            <template x-if="m.role === 'assistant' && m.debug && m.debugMode">
+              <div class="mt-1">
+                <button @click="m.open = !m.open" class="text-[11px] text-slate-400 hover:text-slate-600 inline-flex items-center gap-1">
+                  <span :class="m.debug.outcome !== 'success' ? 'px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[9px] font-semibold uppercase tracking-[0.1em]' : 'px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-semibold uppercase tracking-[0.1em]'" x-text="m.debug.outcome || 'detail'"></span>
+                  <span x-text="m.open ? 'hide detail' : 'detail'"></span>
+                </button>
+                <template x-if="m.open">
+                  <div class="mt-2 bg-slate-50 border border-slate-200/60 rounded-xl p-3 space-y-2 text-[11px]">
+                    <div>
+                      <div class="text-slate-400 mb-0.5">command</div>
+                      <div class="font-mono text-slate-600 break-all" x-text="(m.debug.command || []).join(' ')"></div>
+                    </div>
+                    <template x-if="m.debug.prompt">
+                      <div>
+                        <div class="text-slate-400 mb-0.5">prompt</div>
+                        <div class="font-mono text-slate-600 whitespace-pre-wrap break-words" x-text="m.debug.prompt"></div>
+                      </div>
+                    </template>
+                    <div>
+                      <div class="text-slate-400 mb-0.5">stdout</div>
+                      <pre class="font-mono text-slate-600 whitespace-pre-wrap break-words max-h-64 overflow-y-auto bg-white border border-slate-200/60 rounded-lg p-2" x-text="m.debug.stdout"></pre>
+                    </div>
+                    <div class="text-slate-400 pt-1 border-t border-slate-200/60">
+                      <span x-text="'session ' + (m.debug.session || '—')"></span>
+                      <span class="mx-1">/</span>
+                      <span x-text="'outcome ' + (m.debug.outcome || '—')"></span>
+                      <span class="mx-1">/</span>
+                      <span x-text="(m.debug.duration_ms != null ? m.debug.duration_ms + 'ms' : '—ms')"></span>
+                      <span class="mx-1">/</span>
+                      <span x-text="'exit ' + (m.debug.exit_code != null ? m.debug.exit_code : '—')"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <div class="border-t border-slate-200/60 bg-white/80 backdrop-blur px-4 py-3 shrink-0">
+    <div class="max-w-3xl mx-auto">
+      <div class="border border-slate-200 rounded-2xl bg-white shadow-sm focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-300 transition flex flex-col overflow-hidden">
+        <div class="h-2.5 shrink-0 flex items-center justify-center cursor-ns-resize group select-none"
+             @mousedown="startComposerResize($event)" title="拖动上边沿调整高度">
+          <div class="w-10 h-1 rounded-full bg-slate-200 group-hover:bg-slate-400 transition"></div>
+        </div>
+        <textarea x-model="chatInput"
+          rows="1"
+          placeholder="Message the worker..."
+          @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); sendChat(); }"
+          :style="'height:' + composerHeight + 'px'"
+          class="w-full resize-none overflow-y-auto px-4 py-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-sm text-slate-700 placeholder:text-slate-300"></textarea>
+        <div class="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-100 bg-slate-50/40">
+          <button type="button" @click="toggleChatDebug()"
+            :class="chatDebug ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-slate-500 border-slate-200'"
+            class="h-9 inline-flex items-center gap-1.5 px-2.5 rounded-xl border text-xs transition shrink-0"
+            :title="chatDebug ? 'Debug: worker-like context (seeded)' : 'Chat: bare context'">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.2 4.2l4.3 4.3m7 7 4.3 4.3M1 12h6m10 0h6M4.2 19.8l4.3-4.3m7-7 4.3-4.3"/></svg>
+            <span x-text="chatDebug ? 'Debug ON' : 'Debug OFF'"></span>
+          </button>
+          <button @click="sendChat()" :disabled="chatSending || !chatWorker" class="h-9 px-4 rounded-xl border border-brand-200 text-xs text-brand-600 hover:bg-brand-50 transition inline-flex items-center gap-1.5 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg x-show="chatSending" class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            <span x-text="chatSending ? 'Sending…' : 'Send'"></span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -921,6 +1121,10 @@
         <input type="checkbox" x-model="newProject.bootstrap" class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
         <span>Run bootstrap attempt</span>
       </label>
+      <label class="flex items-center gap-2 px-1 text-sm text-slate-600">
+        <input type="checkbox" x-model="newProject.localEngine" class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+        <span>Local Engine</span>
+      </label>
 
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -1227,7 +1431,7 @@ function cairnApp() {
     exportProjectId: '',
     showDeleteModal: false,
 
-    newProject: { title: '', origin: '', goal: '', bootstrap: true, hints: [{ content: '' }] },
+    newProject: { title: '', origin: '', goal: '', bootstrap: true, localEngine: false, hints: [{ content: '' }] },
     intentForm: { description: '' },
     concludeForm: { description: '', intentId: '' },
     completeForm: { description: '' },
@@ -1263,6 +1467,20 @@ function cairnApp() {
     shouldRestoreProjectListScroll: false,
     isStoppingAllProjects: false,
 
+    engines: [],
+    enginesLoading: false,
+    engineEdit: {},
+
+    chatWorkers: [],
+    chatWorker: '',
+    chatMessages: [],
+    chatSession: null,
+    chatInput: '',
+    chatSending: false,
+    chatError: '',
+    chatDebug: false,
+    composerHeight: 120,
+
     async init() {
       this._panelResizeMove = (e) => this.onPanelResize(e);
       this._panelResizeStop = () => this.stopPanelResize();
@@ -1284,9 +1502,86 @@ function cairnApp() {
         if (this.selectedProjectId !== id || this.view !== 'graph') {
           this.openProject(id);
         }
+      } else if (hash === '#/engines' || hash === '#/engines/') {
+        this.view = 'engines';
+        this.loadEngines();
+      } else if (hash === '#/chat' || hash === '#/chat/') {
+        this.view = 'chat';
+        this.loadChatWorkers();
       } else {
         if (this.view !== 'list') this.backToList(true);
       }
+    },
+
+    async loadEngines() {
+      this.enginesLoading = true;
+      try { const r = await fetch('/engines'); if (r.ok) this.engines = await r.json(); }
+      finally { this.enginesLoading = false; }
+    },
+    _replaceEngine(e) { this.engines = this.engines.map(x => x.type === e.type ? e : x); },
+
+    async loadChatWorkers() {
+      this.chatError = '';
+      try {
+        const r = await fetch('/chat/workers');
+        if (r.ok) { this.chatWorkers = await r.json(); if (!this.chatWorker && this.chatWorkers[0]) this.chatWorker = this.chatWorkers[0].name; }
+        else { this.chatWorkers = []; this.chatError = 'No dispatch config found (set CAIRN_DISPATCH_CONFIG).'; }
+      } catch (e) { this.chatError = 'Failed to load workers.'; }
+    },
+    newChat() { this.chatMessages = []; this.chatSession = null; },
+    toggleChatDebug() {
+      this.chatDebug = !this.chatDebug;
+      this.newChat();                 // reset conversation/session on mode switch
+    },
+    startComposerResize(e) {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = this.composerHeight;
+      const onMove = (ev) => {
+        const delta = startY - ev.clientY;        // drag UP => taller
+        this.composerHeight = Math.min(600, Math.max(60, startH + delta));
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.userSelect = '';
+      };
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    async sendChat() {
+      const msg = (this.chatInput || '').trim();
+      if (!msg || !this.chatWorker || this.chatSending) return;
+      this.chatMessages.push({ role: 'user', text: msg });
+      this.chatInput = ''; this.chatSending = true;
+      try {
+        const r = await fetch('/chat/turn', { method: 'POST', headers: {'content-type':'application/json'},
+          body: JSON.stringify({ worker: this.chatWorker, message: msg, session: this.chatSession, debug: this.chatDebug }) });
+        if (r.ok) {
+          const t = await r.json();
+          this.chatSession = t.session || this.chatSession;
+          this.chatMessages.push({ role: 'assistant', text: t.reply || '(no reply)', debug: t, debugMode: this.chatDebug, open: false });
+        } else {
+          this.chatMessages.push({ role: 'assistant', text: 'request failed (' + r.status + ')', debug: null });
+        }
+      } catch (e) {
+        this.chatMessages.push({ role: 'assistant', text: 'request failed', debug: null });
+      } finally { this.chatSending = false; }
+    },
+    toggleEngineEdit(e) {
+      const cur = this.engineEdit[e.type] || {};
+      this.engineEdit[e.type] = { open: !cur.open, path: (e.override && e.override.path) || (cur.path || ''), launcher: (e.override && e.override.launcher) || (cur.launcher || 'direct') };
+    },
+    async saveEngineOverride(type) {
+      const buf = this.engineEdit[type] || {};
+      if (!buf.path) return;
+      const r = await fetch(`/engines/${type}/override`, { method: 'PUT', headers: {'content-type':'application/json'}, body: JSON.stringify({ path: buf.path, launcher: buf.launcher || 'direct' }) });
+      if (r.ok) { this._replaceEngine(await r.json()); this.engineEdit[type] = { open: false }; }
+    },
+    async clearEngineOverride(type) {
+      const r = await fetch(`/engines/${type}/override`, { method: 'DELETE' });
+      if (r.ok) { this._replaceEngine(await r.json()); this.engineEdit[type] = { open: false }; }
     },
 
     async api(method, path, body) {
@@ -3439,13 +3734,14 @@ function cairnApp() {
           title: this.newProject.title,
           origin: this.newProject.origin,
           goal: this.newProject.goal,
-          bootstrap_enabled: this.newProject.bootstrap
+          bootstrap_enabled: this.newProject.bootstrap,
+          backend: this.newProject.localEngine ? 'local' : 'docker'
         };
         const hints = hintContents.map(h => ({ content: h.content.trim(), creator: actor }));
         if (hints.length > 0) body.hints = hints;
         const data = await this.api('POST', '/projects', body);
         this.showNewProject = false;
-        this.newProject = { title:'', origin:'', goal:'', bootstrap: true, hints: [{ content:'' }] };
+        this.newProject = { title:'', origin:'', goal:'', bootstrap: true, localEngine: false, hints: [{ content:'' }] };
         await this.loadProjects();
         await this.openProject(data.project.id);
         this.showToast('Project created');

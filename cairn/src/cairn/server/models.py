@@ -60,6 +60,45 @@ class ExecutionDetail(ExecutionSummary):
     log_path: str | None = None
 
 
+class ChatWorker(BaseModel):
+    name: str
+    type: str
+    model: str | None = None
+
+
+class ChatTurnRequest(BaseModel):
+    worker: str
+    message: str
+    session: str | None = None
+    debug: bool = False
+
+
+class ChatTurnResult(BaseModel):
+    reply: str
+    session: str | None = None
+    command: list[str]
+    prompt: str
+    stdout: str
+    exit_code: int | None = None
+    outcome: str
+    duration_ms: int = 0
+
+
+class EngineOverride(BaseModel):
+    path: str
+    launcher: Literal["direct", "cmd", "powershell"] = "direct"
+
+
+class EngineInfo(BaseModel):
+    type: str
+    binary: str
+    launchable: bool
+    path: str | None = None
+    version: str | None = None
+    source: str | None = None
+    override: EngineOverride | None = None
+
+
 class Fact(BaseModel):
     id: str
     description: str
@@ -98,6 +137,7 @@ class ProjectMeta(BaseModel):
     title: str
     status: Literal["active", "stopped", "completed"]
     bootstrap_enabled: bool
+    backend: Literal["docker", "local"] = "docker"
     created_at: str
     reason: ProjectReason | None = None
 
@@ -135,6 +175,7 @@ class CreateProjectRequest(BaseModel):
     origin: str
     goal: str
     bootstrap_enabled: bool = True
+    backend: Literal["docker", "local"] = "docker"
     hints: list[CreateHintInline] | None = None
 
     @field_validator("title", "origin", "goal")

@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-DEFAULT_DB = Path.home() / ".local" / "share" / "cairn" / "cairn.db"
+
+def cairn_home() -> Path:
+    override = os.environ.get("CAIRN_HOME")
+    return Path(override).expanduser() if override else Path.home() / ".cairn"
+
+
+def default_db() -> Path:
+    return cairn_home() / "cairn.db"
+
+
+# Backwards-compatible module attribute used by app.py / cli.py defaults.
+DEFAULT_DB = default_db()
 
 _db_path: Path | None = None
 
@@ -22,6 +34,7 @@ CREATE TABLE IF NOT EXISTS projects (
     title TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
     bootstrap_enabled INTEGER NOT NULL DEFAULT 1,
+    backend TEXT NOT NULL DEFAULT 'docker',
     created_at TEXT NOT NULL,
     reason_worker TEXT,
     reason_trigger TEXT,
@@ -141,6 +154,8 @@ def _ensure_project_columns(conn: sqlite3.Connection) -> None:
             conn.execute(
                 "UPDATE projects SET bootstrap_enabled = CASE WHEN bootstrap_mode = 'disabled' THEN 0 ELSE 1 END"
             )
+    if "backend" not in columns:
+        conn.execute("ALTER TABLE projects ADD COLUMN backend TEXT NOT NULL DEFAULT 'docker'")
 
 
 @contextmanager

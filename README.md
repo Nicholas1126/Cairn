@@ -173,6 +173,57 @@ uv run --project cairn cairn dispatch --config dispatch.yaml
 uv run --project cairn cairn dispatch --config dispatch.yaml --startup-healthcheck-only
 ```
 
+### Local Engine (host) worker
+
+By default, each project runs its agent workers inside a Docker container. Checking **Local Engine** in the New Project dialog sets `backend: local` on that project, running workers as host subprocesses instead.
+
+**Prerequisites**
+
+The agent CLI(s) you intend to use must be installed and accessible on the host:
+
+- `claude` (Claude Code)
+- `codex` (OpenAI Codex)
+- `opencode`
+- `pi`
+
+**Running the dispatcher on the host**
+
+The `cairn-dispatcher` Docker container cannot spawn host subprocesses or reach host-installed agents. For Local Engine projects, run the dispatcher directly on the host:
+
+```bash
+uv run --project cairn cairn dispatch --config dispatch.yaml
+```
+
+The server can also run on the host (`uv run --project cairn cairn serve`) if preferred.
+
+**Workspaces and data root**
+
+Each local project gets an isolated workspace at `~/.cairn/workspaces/<project_id>/`. All Cairn data (database, execution logs, workspaces) lives under `~/.cairn/`. Set `CAIRN_HOME` to override the root.
+
+**Engine overrides**
+
+If an agent binary is not on a standard path, create `~/.cairn/engines.json`:
+
+```json
+{
+  "claude":   {"path": "/opt/homebrew/bin/claude"},
+  "codex":    {"path": "/usr/local/bin/codex", "launcher": "direct"}
+}
+```
+
+Supported `launcher` values: `direct` (default on macOS/Linux), `cmd`, `powershell` (Windows).
+
+**Cross-platform**
+
+| Agent | macOS / Linux | Windows |
+|-------|--------------|---------|
+| `claude`, `codex` | Supported | Supported (`.cmd` / `.exe` resolved automatically) |
+| `opencode`, `pi` | Supported | Requires `sh` on PATH (e.g. Git Bash) |
+
+**Security note**
+
+Local agents run as the host user with no filesystem or network sandbox, share host resources, and cannot access the security tools bundled in the Docker image. Use Docker mode when isolation matters.
+
 ### Tests
 
 Run the fast regression suite without Docker or live model endpoints:

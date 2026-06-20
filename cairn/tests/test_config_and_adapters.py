@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -11,6 +12,39 @@ from cairn.dispatcher.workers.adapters.opencode import OpenCodeDriver
 from cairn.dispatcher.workers.adapters.pi import PiDriver
 
 from conftest import make_config
+
+
+def _minimal_dispatch_dict() -> dict[str, Any]:
+    return {
+        "server": "http://127.0.0.1:8000",
+        "runtime": {
+            "interval": 60,
+            "max_workers": 2,
+            "max_running_projects": 1,
+            "max_project_workers": 2,
+            "healthcheck_timeout": 5,
+            "prompt_group": "default",
+        },
+        "tasks": {
+            "bootstrap": {"timeout": 10, "conclude_timeout": 5},
+            "reason": {"timeout": 10, "max_intents": 3},
+            "explore": {"timeout": 10, "conclude_timeout": 5},
+        },
+        "container": {
+            "image": "test-image",
+            "network_mode": "host",
+            "completed_action": "stop",
+        },
+        "workers": [
+            {
+                "name": "test-worker",
+                "type": "mock",
+                "task_types": ["bootstrap", "reason", "explore"],
+                "max_running": 1,
+                "priority": 0,
+            }
+        ],
+    }
 
 
 def test_dispatch_config_merges_common_env_with_worker_override() -> None:
@@ -224,3 +258,19 @@ def test_opencode_worker_accepts_full_env() -> None:
         }
     )
     assert worker.type == "opencode"
+
+
+def test_local_config_defaults_when_absent():
+    from cairn.dispatcher.config import DispatchConfig
+    cfg = DispatchConfig.model_validate(_minimal_dispatch_dict())
+    assert cfg.local.workspaces_root.endswith("workspaces")
+    assert cfg.local.completed_action in ("remove", "stop")
+
+
+def test_local_config_override():
+    from cairn.dispatcher.config import DispatchConfig
+    d = _minimal_dispatch_dict()
+    d["local"] = {"workspaces_root": "/tmp/ws", "completed_action": "stop"}
+    cfg = DispatchConfig.model_validate(d)
+    assert cfg.local.workspaces_root == "/tmp/ws"
+    assert cfg.local.completed_action == "stop"

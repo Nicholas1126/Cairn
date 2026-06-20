@@ -143,7 +143,7 @@ def write_graph_snapshot_reference(
     *,
     phase: str,
 ) -> str:
-    path = f"{GRAPH_SNAPSHOT_ROOT}/{phase}-{uuid.uuid4().hex[:12]}/graph.yaml"
+    path = f"{container_manager.snapshot_root()}/{phase}-{uuid.uuid4().hex[:12]}/graph.yaml"
     container_manager.write_text_file(container_name, path, graph_yaml)
     return (
         "The graph YAML snapshot is stored in this file inside the current container:\n\n"

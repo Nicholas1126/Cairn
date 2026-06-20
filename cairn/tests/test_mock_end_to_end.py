@@ -167,6 +167,9 @@ class LocalContainerManager:
     def write_text_file(self, container_name: str, path: str, content: str) -> None:
         self.writes.append((container_name, path, content))
 
+    def snapshot_root(self) -> str:
+        return "/tmp/cairn-prompts"
+
     def needs_completed_cleanup(self, _project_id: str) -> bool:
         return False
 
@@ -251,6 +254,7 @@ def _loop(config: DispatchConfig, client: InProcessClient, containers: LocalCont
     loop.config = config
     loop.client = client
     loop.container_manager = containers
+    loop._local_runtime = None
     loop.executor = ThreadPoolExecutor(max_workers=config.runtime.max_workers)
     loop.cleanup_executor = ThreadPoolExecutor(max_workers=1)
     loop.futures = {}

@@ -154,6 +154,83 @@ Worker 选择规则：
 
 ---
 
+## Runtime 后端
+
+### Runtime 协议
+
+Dispatcher 通过统一的 `Runtime` 协议抽象执行后端，支持两种实现：
+
+| 后端 | 实现类 | 项目 `backend` 值 |
+| --- | --- | --- |
+| Docker 容器 | `ContainerManager` | `docker`（默认） |
+| 宿主机进程 | `LocalRuntime` | `local` |
+
+调度器在启动每个项目的执行路径前，按 `project.backend` 字段路由到对应实现；两类项目可在同一 Dispatcher 进程中并行运行。
+
+### 宿主机后端（LocalRuntime）
+
+`LocalRuntime` 将相同的 `WorkerDriver` argv 作为宿主机子进程直接执行，无需 Docker。Worker 选择逻辑不变：Local 项目仍按 `dispatch.yaml` 中的 `workers[]` 配置派发相同的 Worker driver。
+
+每个项目的宿主机工作区位于 `~/.cairn/workspaces/<project_id>/`，启动时从代码库 `container/` 目录复制 agent 配置文件，与镜像内保持一致。
+
+全局数据根目录为 `~/.cairn/`（数据库 `cairn.db`、执行日志 `executions/`、工作区 `workspaces/`）；可通过 `CAIRN_HOME` 环境变量覆盖。
+
+### 引擎解析器与 probe_engine
+
+宿主机后端在首次使用某种 agent 类型前，会通过 `runtime/local/resolve.py` 定位可执行文件：
+
+- 搜索标准 `PATH`，以及 npm prefix、Homebrew、nvm 等常见安装位置；
+- Windows 优先匹配 `.cmd` > `.exe` > `.ps1`；
+- 定位后执行 `probe_engine`，运行最小探活命令，确认二进制可实际调用。
+
+`~/.cairn/engines.json`（可选）可以覆盖自动解析的路径：
+
+```json
+{
+  "claude":   {"path": "/opt/homebrew/bin/claude"},
+  "codex":    {"path": "/usr/local/bin/codex", "launcher": "direct"},
+  "opencode": {"path": "/usr/local/bin/opencode", "launcher": "direct"},
+  "pi":       {"path": "/usr/local/bin/pi", "launcher": "direct"}
+}
+```
+
+`launcher` 可选值：`direct`（默认）、`cmd`、`powershell`。
+
+### 超时与取消
+
+本地进程的超时和取消通过杀掉整个进程树实现：
+
+- Unix（macOS / Linux）：向进程组发送信号（`os.killpg`）；
+- Windows：`taskkill /T /F`，递归终止子进程树。
+
+超时后的 conclude fallback 流程与 Docker 模式一致。
+
+### `local:` 配置块
+
+`dispatch.yaml` 支持一个可选的顶层 `local:` 块，控制宿主机后端行为；所有字段均有默认值：
+
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `local.workspaces_root` | `~/.cairn/workspaces` | 工作区根目录 |
+| `local.completed_action` | `stop` | 项目完成后工作区处理：`remove`（删除）或 `stop`（保留） |
+| `local.engines_config` | `~/.cairn/engines.json` | 引擎覆盖配置文件路径 |
+
+### 跨平台兼容性
+
+| Agent | macOS / Linux | Windows |
+| --- | --- | --- |
+| `claudecode`、`codex` | 支持 | 支持（resolver 自动匹配 `.cmd` / `.exe`） |
+| `opencode`、`pi` | 支持 | 需要 `sh` 在 PATH 中（如 Git Bash），因为执行命令以 `/bin/sh -lc` 包裹 |
+
+### 安全说明与已知限制
+
+1. **无隔离**：本地 agent 以宿主机用户身份运行，工作区是普通目录而非沙箱；agent 可以访问宿主机文件系统和网络。
+2. **无内置工具**：Docker 镜像内置的安全工具和知识库在宿主机模式下不存在。
+3. **资源共用**：本地进程与宿主机其他进程共享资源，仅受 `runtime.max_workers` / `runtime.max_project_workers` 限制。
+4. **部署要求**：宿主机模式下，Dispatcher 必须直接运行在宿主机上（`uv run cairn dispatch`）；`docker-compose` 的 `cairn-dispatcher` 容器内无法启动宿主机进程，也无法访问宿主机安装的 agent。
+
+---
+
 ## 配置模型
 
 Dispatcher 使用一个运行期配置文件：

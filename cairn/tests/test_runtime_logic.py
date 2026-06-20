@@ -116,3 +116,22 @@ def test_write_text_file_uses_archive_api_and_rejects_false_result() -> None:
         assert "failed to write container file" in str(exc)
     else:
         raise AssertionError("expected failed put_archive result to raise")
+
+
+def test_runtime_for_routes_by_backend():
+    from cairn.dispatcher.scheduler.loop import DispatcherLoop
+
+    class _Loop(DispatcherLoop):
+        def __init__(self):  # bypass real __init__ / config / docker
+            self.container_manager = object()
+            self._local_runtime = object()
+
+    loop = _Loop()
+
+    class _Meta:
+        def __init__(self, backend): self.backend = backend
+    class _Proj:
+        def __init__(self, backend): self.project = _Meta(backend)
+
+    assert loop._runtime_for(_Proj("docker")) is loop.container_manager
+    assert loop._runtime_for(_Proj("local")) is loop._local_runtime
