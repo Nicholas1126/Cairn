@@ -13,6 +13,7 @@ from cairn.dispatcher.models import ReasonCheckpoint, RunningTask
 from cairn.dispatcher.protocol.client import CairnClient
 from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
+from cairn.dispatcher.runtime.local.runtime import LocalRuntime
 from cairn.dispatcher.runtime.startup_healthcheck import format_failure_summary, run_startup_healthchecks
 from cairn.dispatcher.scheduler.worker_select import choose_worker
 from cairn.dispatcher.tasks.bootstrap import run_bootstrap_task
@@ -42,6 +43,7 @@ class DispatcherLoop:
         self.config = DispatchConfig.load(config_path)
         self.client = CairnClient(self.config.server)
         self.container_manager = ContainerManager(self.config.container)
+        self._local_runtime = None
         self.executor = ThreadPoolExecutor(max_workers=self.config.runtime.max_workers)
         self.cleanup_executor = ThreadPoolExecutor(max_workers=max(1, min(8, self.config.runtime.max_workers)))
         self.futures: dict[Future[str], RunningTask] = {}
@@ -57,6 +59,21 @@ class DispatcherLoop:
         self._settings_checked = False
         self._startup_healthchecks_checked = False
 
+    def _ensure_local_runtime(self):
+        if self._local_runtime is None:
+            agents_source = Path(__file__).resolve().parents[5] / "container"
+            self._local_runtime = LocalRuntime(
+                workspaces_root=self.config.local.workspaces_root,
+                completed_action=self.config.local.completed_action,
+                agents_source=str(agents_source) if agents_source.exists() else None,
+            )
+        return self._local_runtime
+
+    def _runtime_for(self, project) -> object:
+        if getattr(project.project, "backend", "docker") == "local":
+            return self._ensure_local_runtime()
+        return self.container_manager
+
     def close(self) -> None:
         if self.futures:
             LOG.info(
@@ -67,6 +84,8 @@ class DispatcherLoop:
         self.executor.shutdown(wait=True)
         self.cleanup_executor.shutdown(wait=True)
         self.container_manager.close()
+        if self._local_runtime is not None:
+            self._local_runtime.close()
         self.client.close()
 
     def run(self, once: bool = False) -> None:
@@ -331,7 +350,7 @@ class DispatcherLoop:
                 run_reason_task,
                 self.config,
                 self.client,
-                self.container_manager,
+                self._runtime_for(project),
                 project,
                 export_yaml,
                 worker,
@@ -398,7 +417,7 @@ class DispatcherLoop:
                 run_bootstrap_task,
                 self.config,
                 self.client,
-                self.container_manager,
+                self._runtime_for(project),
                 project,
                 intent,
                 worker,
@@ -456,7 +475,7 @@ class DispatcherLoop:
                 run_explore_task,
                 self.config,
                 self.client,
-                self.container_manager,
+                self._runtime_for(project),
                 project,
                 export_yaml,
                 intent,
@@ -716,13 +735,14 @@ class DispatcherLoop:
                 continue
             if self._inactive_cleanup_done.get(summary.id) == summary.status:
                 continue
-            container_name = self.container_manager.container_name(summary.id)
+            runtime = self._ensure_local_runtime() if getattr(summary, "backend", "docker") == "local" else self.container_manager
+            container_name = runtime.container_name(summary.id)
             if container_name in self._cleanup_pending:
                 continue
-            if not self.container_manager.needs_completed_cleanup(summary.id):
+            if not runtime.needs_completed_cleanup(summary.id):
                 self._inactive_cleanup_done[summary.id] = summary.status
                 continue
-            future = self.cleanup_executor.submit(self.container_manager.cleanup_completed, summary.id)
+            future = self.cleanup_executor.submit(runtime.cleanup_completed, summary.id)
             self.cleanup_futures[future] = (container_name, summary.id, summary.status)
             self._cleanup_pending.add(container_name)
 
@@ -732,13 +752,14 @@ class DispatcherLoop:
                 continue
             if self._inactive_cleanup_done.get(summary.id) == summary.status:
                 continue
-            container_name = self.container_manager.container_name(summary.id)
+            runtime = self._ensure_local_runtime() if getattr(summary, "backend", "docker") == "local" else self.container_manager
+            container_name = runtime.container_name(summary.id)
             if container_name in self._cleanup_pending:
                 continue
-            if not self.container_manager.needs_stopped_cleanup(summary.id):
+            if not runtime.needs_stopped_cleanup(summary.id):
                 self._inactive_cleanup_done[summary.id] = summary.status
                 continue
-            future = self.cleanup_executor.submit(self.container_manager.cleanup_stopped, summary.id)
+            future = self.cleanup_executor.submit(runtime.cleanup_stopped, summary.id)
             self.cleanup_futures[future] = (container_name, summary.id, summary.status)
             self._cleanup_pending.add(container_name)
 
