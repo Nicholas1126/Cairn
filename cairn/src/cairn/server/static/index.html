@@ -921,6 +921,10 @@
         <input type="checkbox" x-model="newProject.bootstrap" class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
         <span>Run bootstrap attempt</span>
       </label>
+      <label class="flex items-center gap-2 px-1 text-sm text-slate-600">
+        <input type="checkbox" x-model="newProject.localEngine" class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
+        <span>Local Engine</span>
+      </label>
 
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -1227,7 +1231,7 @@ function cairnApp() {
     exportProjectId: '',
     showDeleteModal: false,
 
-    newProject: { title: '', origin: '', goal: '', bootstrap: true, hints: [{ content: '' }] },
+    newProject: { title: '', origin: '', goal: '', bootstrap: true, localEngine: false, hints: [{ content: '' }] },
     intentForm: { description: '' },
     concludeForm: { description: '', intentId: '' },
     completeForm: { description: '' },
@@ -3439,13 +3443,14 @@ function cairnApp() {
           title: this.newProject.title,
           origin: this.newProject.origin,
           goal: this.newProject.goal,
-          bootstrap_enabled: this.newProject.bootstrap
+          bootstrap_enabled: this.newProject.bootstrap,
+          backend: this.newProject.localEngine ? 'local' : 'docker'
         };
         const hints = hintContents.map(h => ({ content: h.content.trim(), creator: actor }));
         if (hints.length > 0) body.hints = hints;
         const data = await this.api('POST', '/projects', body);
         this.showNewProject = false;
-        this.newProject = { title:'', origin:'', goal:'', bootstrap: true, hints: [{ content:'' }] };
+        this.newProject = { title:'', origin:'', goal:'', bootstrap: true, localEngine: false, hints: [{ content:'' }] };
         await this.loadProjects();
         await this.openProject(data.project.id);
         this.showToast('Project created');
