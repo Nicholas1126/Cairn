@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from cairn import __version__
 from cairn.server import db
-from cairn.server.routers import executions, export, hints, intents, projects, settings
+from cairn.server.routers import engines, executions, export, hints, intents, projects, settings
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -25,6 +25,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(engines.router)
 app.include_router(settings.router)
 app.include_router(projects.router)
 app.include_router(hints.router)
