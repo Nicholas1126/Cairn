@@ -98,6 +98,7 @@ class ProjectMeta(BaseModel):
     title: str
     status: Literal["active", "stopped", "completed"]
     bootstrap_enabled: bool
+    backend: Literal["docker", "local"] = "docker"
     created_at: str
     reason: ProjectReason | None = None
 
@@ -135,6 +136,7 @@ class CreateProjectRequest(BaseModel):
     origin: str
     goal: str
     bootstrap_enabled: bool = True
+    backend: Literal["docker", "local"] = "docker"
     hints: list[CreateHintInline] | None = None
 
     @field_validator("title", "origin", "goal")

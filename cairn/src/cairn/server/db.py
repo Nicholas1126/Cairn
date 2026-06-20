@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS projects (
     title TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
     bootstrap_enabled INTEGER NOT NULL DEFAULT 1,
+    backend TEXT NOT NULL DEFAULT 'docker',
     created_at TEXT NOT NULL,
     reason_worker TEXT,
     reason_trigger TEXT,
@@ -153,6 +154,8 @@ def _ensure_project_columns(conn: sqlite3.Connection) -> None:
             conn.execute(
                 "UPDATE projects SET bootstrap_enabled = CASE WHEN bootstrap_mode = 'disabled' THEN 0 ELSE 1 END"
             )
+    if "backend" not in columns:
+        conn.execute("ALTER TABLE projects ADD COLUMN backend TEXT NOT NULL DEFAULT 'docker'")
 
 
 @contextmanager
