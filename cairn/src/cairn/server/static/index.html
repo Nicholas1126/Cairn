@@ -350,6 +350,12 @@
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z"/></svg>
               <span x-text="p.hint_count"></span>
             </span>
+            <span class="flex items-center gap-1"
+              :class="p.backend === 'local' ? 'text-brand-600' : 'text-slate-400'"
+              :title="p.backend === 'local' ? 'Local Engine (host)' : 'Docker container'">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>
+              <span x-text="p.backend"></span>
+            </span>
           </div>
           <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-400">
             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M8 2v3M16 2v3"/><path d="M3.5 9.5h17"/><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 13h3M8 16h6"/></svg>
