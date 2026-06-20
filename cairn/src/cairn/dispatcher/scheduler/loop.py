@@ -201,7 +201,8 @@ class DispatcherLoop:
 
     def _try_dispatch_project(self, summary: ProjectSummary) -> bool:
         skip_scope = f"project:{summary.id}:skip"
-        container_name = self.container_manager.container_name(summary.id)
+        runtime = self._ensure_local_runtime() if getattr(summary, "backend", "docker") == "local" else self.container_manager
+        container_name = runtime.container_name(summary.id)
         if container_name in self._cleanup_pending:
             self._log_changed(
                 f"{skip_scope}:cleanup_pending",
