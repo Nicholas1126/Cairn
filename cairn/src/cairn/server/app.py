@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from cairn import __version__
 from cairn.server import db
-from cairn.server.routers import chat, engines, executions, export, hints, intents, projects, settings
+from cairn.server.routers import chat, engines, executions, export, hints, intents, projects, settings, skills
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -15,6 +15,9 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.configure(db.DEFAULT_DB)
+    from cairn import skills_store
+    repo_skills = Path(__file__).resolve().parents[4] / "skills"
+    skills_store.seed_if_empty(repo_skills)
     yield
 
 
@@ -33,6 +36,7 @@ app.include_router(hints.router)
 app.include_router(intents.router)
 app.include_router(export.router)
 app.include_router(executions.router)
+app.include_router(skills.router)
 
 
 @app.get("/", include_in_schema=False)
