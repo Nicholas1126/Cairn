@@ -60,6 +60,29 @@ class ExecutionDetail(ExecutionSummary):
     log_path: str | None = None
 
 
+class ChatWorker(BaseModel):
+    name: str
+    type: str
+    model: str | None = None
+
+
+class ChatTurnRequest(BaseModel):
+    worker: str
+    message: str
+    session: str | None = None
+
+
+class ChatTurnResult(BaseModel):
+    reply: str
+    session: str | None = None
+    command: list[str]
+    prompt: str
+    stdout: str
+    exit_code: int | None = None
+    outcome: str
+    duration_ms: int = 0
+
+
 class EngineOverride(BaseModel):
     path: str
     launcher: Literal["direct", "cmd", "powershell"] = "direct"
