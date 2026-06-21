@@ -42,3 +42,5 @@ Normal return example:
 ```
 
 {skills}
+
+{project_knowledge}

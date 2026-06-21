@@ -46,6 +46,8 @@ If Goal has not been satisfied and no new intent should currently be proposed, r
 
 {skills}
 
+{project_knowledge}
+
 ### Valid facts
 ```
 {fact_ids}

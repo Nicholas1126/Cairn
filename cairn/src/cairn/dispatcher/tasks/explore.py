@@ -12,6 +12,7 @@ from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
     prepare_skills,
+    prepare_project_knowledge,
     ExecutionRecorder,
     model_env_key,
     best_effort_release,
@@ -51,7 +52,7 @@ def run_explore_task(
     lease = HeartbeatLease.for_intent(client, project.project.id, intent.id, worker.name, config.runtime.interval)
     lease.start()
     try:
-        container_name = container_manager.ensure_running(project.project.id)
+        container_name = container_manager.ensure_running(project.project.id, project.project.project_root)
 
         if task_healthcheck_enabled(config):
             LOG.info(
@@ -118,6 +119,7 @@ def run_explore_task(
                 "intent_id": intent.id,
                 "intent_description": intent.description,
                 "skills": prepare_skills(container_manager, container_name),
+                "project_knowledge": prepare_project_knowledge(project.project.project_root),
             },
         )
 
@@ -337,6 +339,9 @@ def _try_conclude_fallback(
             "intent_id": intent.id,
             "intent_description": intent.description,
             "skills": prepare_skills(container_manager, container_name),
+            "project_knowledge": prepare_project_knowledge(
+                client.get_project(project_id).project.project_root
+            ),
         },
     )
     conclude_argv = driver.build_conclude(worker, prompt, session)
