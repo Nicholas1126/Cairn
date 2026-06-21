@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from cairn.dispatcher.runtime.local import resolve
-from cairn.server.models import EngineInfo, EngineOverride
+from cairn.server.models import EngineInfo, EngineOverride, ToolInfo
 
 router = APIRouter(tags=["engines"])
 
@@ -25,6 +25,16 @@ def _engine_info(worker_type: str) -> EngineInfo:
 @router.get("/engines", response_model=list[EngineInfo])
 def list_engines():
     return [_engine_info(t) for t in resolve.BINARY]
+
+
+@router.get("/tools", response_model=list[ToolInfo])
+def list_tools():
+    out = []
+    for name in resolve.TOOLS:
+        probe = resolve.probe_tool(name)
+        out.append(ToolInfo(name=name, launchable=probe["launchable"],
+                            version=probe["version"], path=probe["path"]))
+    return out
 
 
 @router.put("/engines/{worker_type}/override", response_model=EngineInfo)
