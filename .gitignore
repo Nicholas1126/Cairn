@@ -9,3 +9,6 @@ dispatch.*.yaml
 
 # generated knowledge graph (local artifact)
 graphify-out/
+
+# superpowers visual-companion / brainstorm temp files
+.superpowers/
