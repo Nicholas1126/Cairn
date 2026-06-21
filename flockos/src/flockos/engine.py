@@ -75,9 +75,29 @@ class CairnAgentEngine(EngineComponent):
         driver = get_driver(self.worker.type)
         prompt = self._build_prompt(agent, inputs, output_group)
 
-        argv, session = self._build_argv(prompt)
-        stdout, stderr, rc = self._run(argv, {}, self.cwd, self.timeout)
-        text = driver.extract_response_text(stdout, stderr)
-        data = self._extract_json(text)
-        instance = model_cls(**data)
-        return EvalResult.from_object(instance, agent=agent)
+        attempts = max(1, self.retries + 1)
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            run_prompt = prompt
+            if attempt > 0:
+                run_prompt = (
+                    prompt
+                    + "\n\nYour previous response was not valid JSON. "
+                    "Respond with ONLY the raw JSON object, nothing else."
+                )
+            argv, session = self._build_argv(run_prompt)
+            stdout, stderr, rc = self._run(argv, {}, self.cwd, self.timeout)
+            text = driver.extract_response_text(stdout, stderr)
+            try:
+                data = self._extract_json(text)
+                instance = model_cls(**data)
+            except (ValueError, json.JSONDecodeError, TypeError) as exc:
+                last_error = exc
+                continue
+            return EvalResult.from_object(instance, agent=agent)
+
+        return EvalResult(
+            artifacts=[],
+            state=dict(inputs.state),
+            logs=[f"CairnAgentEngine failed to produce valid {model_cls.__name__}: {last_error}"],
+        )

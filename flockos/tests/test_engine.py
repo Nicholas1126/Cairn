@@ -92,3 +92,67 @@ async def test_evaluate_parses_agent_json_into_output_type(monkeypatch):
     assert len(artifacts) == 1
     assert artifacts[0].payload["name"] == "Margherita"
     assert artifacts[0].payload["toppings"] == ["basil"]
+
+
+@pytest.mark.asyncio
+async def test_evaluate_repairs_invalid_json(monkeypatch):
+    flock = Flock("test")
+    agent = (
+        flock.agent("chef2")
+        .consumes(Idea)
+        .publishes(Pizza)
+        .with_engines(CairnAgentEngine(worker=_claude_worker(), retries=1))
+    )
+
+    calls = {"n": 0}
+
+    def fake_run(self, argv, extra_env, cwd, timeout):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return ("sorry, here is your pizza!", "", 0)  # not JSON
+        return (json.dumps({"name": "Repaired", "toppings": []}), "", 0)
+
+    monkeypatch.setattr(CairnAgentEngine, "_run", fake_run)
+    artifacts = await flock.invoke(agent, Idea(topic="x"))
+    assert calls["n"] == 2
+    assert artifacts[0].payload["name"] == "Repaired"
+
+
+@pytest.mark.asyncio
+async def test_evaluate_returns_empty_with_error_after_retries(monkeypatch):
+    """After all retries exhausted, evaluate() returns EvalResult with no artifacts.
+
+    Tested directly on the engine (not via flock.invoke) because Flock's output
+    processor raises a contract-violation ValueError when an engine returns an empty
+    EvalResult for a declared output — that's Flock's behaviour, not ours.
+    """
+
+    class _MockArtifact:
+        payload = {"topic": "x"}
+
+    class _MockInputs:
+        artifacts = [_MockArtifact()]
+        state: dict = {}
+
+    class _MockSpec:
+        model = Pizza
+
+    class _MockOutput:
+        spec = _MockSpec()
+
+    class _MockOutputGroup:
+        outputs = [_MockOutput()]
+
+    class _MockAgent:
+        name = "chef3"
+        description = ""
+
+    engine = CairnAgentEngine(worker=_claude_worker(), retries=1)
+    monkeypatch.setattr(CairnAgentEngine, "_run",
+                        lambda self, *a, **k: ("never json", "", 0))
+    result = await engine.evaluate(
+        _MockAgent(), None, _MockInputs(), _MockOutputGroup()
+    )
+    assert result.artifacts == []
+    # EvalResult has no `errors` field — error message is stored in logs
+    assert any("Pizza" in e for e in result.logs)
