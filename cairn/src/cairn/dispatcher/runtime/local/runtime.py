@@ -88,6 +88,15 @@ class LocalRuntime:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
 
+    def install_skills(self, name: str, skill_dirs: list) -> None:
+        ws = self._workspace_for_key(name)
+        dest_root = ws / ".claude" / "skills"
+        for src in skill_dirs:
+            src = Path(src)
+            if not src.is_dir():
+                continue
+            shutil.copytree(src, dest_root / src.name, dirs_exist_ok=True)
+
     def snapshot_root(self) -> str:
         self._snapshot_root.mkdir(parents=True, exist_ok=True)
         return str(self._snapshot_root)

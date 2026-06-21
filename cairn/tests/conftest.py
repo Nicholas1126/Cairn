@@ -109,6 +109,9 @@ class FakeContainerManager:
     def snapshot_root(self) -> str:
         return "/tmp/cairn-prompts"
 
+    def install_skills(self, container_name, skill_dirs):
+        pass
+
 
 @dataclass
 class FakeClient:
