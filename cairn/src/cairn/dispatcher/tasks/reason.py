@@ -16,6 +16,7 @@ from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
+    prepare_skills,
     ExecutionRecorder,
     model_env_key,
     best_effort_release_reason,
@@ -131,6 +132,7 @@ def run_reason_task(
                 "fact_ids": format_fact_ids(allowed_fact_ids),
                 "open_intents": format_open_intents(open_intents),
                 "max_intents": str(config.tasks.reason.max_intents),
+                "skills": prepare_skills(container_manager, container_name),
             },
         )
 

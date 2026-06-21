@@ -11,6 +11,7 @@ from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
+    prepare_skills,
     ExecutionRecorder,
     model_env_key,
     best_effort_release,
@@ -116,6 +117,7 @@ def run_explore_task(
                 ),
                 "intent_id": intent.id,
                 "intent_description": intent.description,
+                "skills": prepare_skills(container_manager, container_name),
             },
         )
 
@@ -334,6 +336,7 @@ def _try_conclude_fallback(
             ),
             "intent_id": intent.id,
             "intent_description": intent.description,
+            "skills": prepare_skills(container_manager, container_name),
         },
     )
     conclude_argv = driver.build_conclude(worker, prompt, session)
