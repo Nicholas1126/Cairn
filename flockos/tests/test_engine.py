@@ -182,3 +182,68 @@ def test_cairn_agent_helper_attaches_engine():
     built = agent  # AgentBuilder (PublishBuilder wraps it, ._agent is the real Agent)
     # with_engines stores into self._agent.engines (verified via AgentBuilder.with_engines source)
     assert any(isinstance(e, CairnAgentEngine) for e in built._agent.engines)
+
+
+# --- direct-evaluate helpers (bypass Flock's output-contract layer) ---
+
+
+def _mock_eval_objects(model=Pizza, payloads=({"topic": "x"},)):
+    arts = [type("A", (), {"payload": dict(p)})() for p in payloads]
+    inputs = type("I", (), {"artifacts": arts, "state": {}})()
+    spec = type("S", (), {"model": model})()
+    out = type("O", (), {"spec": spec})()
+    group = type("G", (), {"outputs": [out]})()
+    agent = type("Ag", (), {"name": "x", "description": ""})()
+    return agent, inputs, group
+
+
+@pytest.mark.asyncio
+async def test_evaluate_nonzero_exit_short_circuits_without_retry(monkeypatch):
+    """A nonzero process exit with no JSON is a hard failure: no retry, stderr surfaced."""
+    engine = CairnAgentEngine(worker=_claude_worker(), retries=3)
+    calls = {"n": 0}
+
+    def fake_run(self, argv, extra_env, cwd, timeout):
+        calls["n"] += 1
+        return ("", "auth error: bad token", 1)
+
+    monkeypatch.setattr(CairnAgentEngine, "_run", fake_run)
+    agent, inputs, group = _mock_eval_objects()
+    result = await engine.evaluate(agent, None, inputs, group)
+    assert calls["n"] == 1  # did NOT burn all 4 attempts
+    assert result.artifacts == []
+    assert any("exited 1" in log and "auth error" in log for log in result.logs)
+
+
+@pytest.mark.asyncio
+async def test_evaluate_multi_input_uses_inputs_plural_in_prompt(monkeypatch):
+    engine = CairnAgentEngine(worker=_claude_worker())
+    seen = {}
+
+    def fake_run(self, argv, extra_env, cwd, timeout):
+        seen["prompt"] = argv[-1]
+        return (json.dumps({"name": "P", "toppings": []}), "", 0)
+
+    monkeypatch.setattr(CairnAgentEngine, "_run", fake_run)
+    agent, inputs, group = _mock_eval_objects(
+        payloads=({"topic": "a"}, {"topic": "b"})
+    )
+    result = await engine.evaluate(agent, None, inputs, group)
+    assert result.artifacts and result.artifacts[0].payload["name"] == "P"
+    assert "Inputs:" in seen["prompt"]  # plural branch (2 inputs)
+
+
+def test_from_dispatch_maps_workers_by_name(monkeypatch):
+    from types import SimpleNamespace
+
+    import cairn.dispatcher.config as cfgmod
+
+    worker = _claude_worker()
+    monkeypatch.setattr(
+        cfgmod.DispatchConfig, "load",
+        lambda path: SimpleNamespace(workers=[worker]),
+    )
+    cfg = CairnConfig.from_dispatch("/whatever/dispatch.yaml", default_timeout=99)
+    assert set(cfg.workers) == {"flock-claude"}
+    assert cfg.default_timeout == 99
+    assert cfg.build_engine("flock-claude").worker is worker

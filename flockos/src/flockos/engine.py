@@ -95,7 +95,22 @@ class CairnAgentEngine(EngineComponent):
                 instance = model_cls(**data)
             except (ValueError, json.JSONDecodeError, TypeError) as exc:
                 last_error = exc
+                # A nonzero exit with no parseable output is a hard failure
+                # (auth/config/timeout — LocalManagedProcess returns rc=137 on
+                # timeout rather than raising). Retrying the same broken config
+                # won't help, so stop now and surface stderr for diagnosis.
+                if rc != 0:
+                    return EvalResult(
+                        artifacts=[],
+                        state=dict(inputs.state),
+                        logs=[
+                            f"CairnAgentEngine: {self.worker.type} exited {rc} with no "
+                            f"valid {model_cls.__name__}; stderr: {stderr.strip()[:500]}"
+                        ],
+                    )
                 continue
+            # Parse succeeded — return the artifact regardless of rc (some CLIs
+            # emit valid output then exit nonzero on a non-fatal warning).
             return EvalResult.from_object(instance, agent=agent)
 
         return EvalResult(
