@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.runtime.process import ProcessResult
 from cairn.execlog import redact_command, redact_text, truncate_head_tail
 from cairn import skills_store
-from cairn.dispatcher.prompting import format_skills
+from cairn.dispatcher.prompting import format_skills, format_project_knowledge
 
 HEALTHCHECK_COMMUNICATE_GRACE_SECONDS = 10
 PROCESS_COMMUNICATE_GRACE_SECONDS = 15
@@ -36,6 +37,24 @@ def prepare_skills(runtime, workspace_key: str) -> str:
     except Exception:
         LOG.warning("skill install failed for %s", workspace_key)
     return format_skills(metas)
+
+
+# project root subdirs we probe for, in canonical layout
+_PROJECT_KNOWLEDGE_SUBDIRS = ("src-repo", "docs-out", "graphify-out", "scan-out", "codegraph-out")
+
+
+def prepare_project_knowledge(project_root: str | None) -> str:
+    """Probe the project root A for known prior-analysis subdirs and render the
+    {project_knowledge} prompt text. Empty when no root / no known subdirs.
+    Probed on the dispatcher host (which is also the docker bind-mount source)."""
+    if not project_root:
+        return ""
+    try:
+        present = [name for name in _PROJECT_KNOWLEDGE_SUBDIRS
+                   if os.path.isdir(os.path.join(project_root, name))]
+    except OSError:
+        return ""
+    return format_project_knowledge(project_root, present)
 
 
 def utcnow_iso() -> str:

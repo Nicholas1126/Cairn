@@ -45,3 +45,32 @@ def format_skills(skills) -> str:
         desc = (s.description or "").strip()
         lines.append(f"- {s.name}: {desc}  (.claude/skills/{s.name}/SKILL.md)")
     return "\n".join(lines)
+
+
+# project knowledge subdir -> one-line usage directive (relative to ./project)
+_PK_USAGE = {
+    "src-repo": "source code: read / grep `./project/src-repo`",
+    "codegraph-out": "code graph: query with the `codegraph` CLI (query / explore / node / callers / impact) over `./project/codegraph-out`",
+    "graphify-out": "domain knowledge graph: run `graphify query \"<question>\"` over `./project/graphify-out`",
+    "scan-out": "static scan findings: read `./project/scan-out`",
+    "docs-out": "product docs: read `./project/docs-out`",
+}
+# canonical render order
+_PK_ORDER = ["src-repo", "docs-out", "graphify-out", "scan-out", "codegraph-out"]
+
+
+def format_project_knowledge(project_root, present_subdirs) -> str:
+    if not project_root or not present_subdirs:
+        return ""
+    present = set(present_subdirs)
+    items = [_PK_USAGE[name] for name in _PK_ORDER if name in present and name in _PK_USAGE]
+    if not items:
+        return ""
+    lines = [
+        "## Project Knowledge (prior analysis, read-only at ./project)",
+        "Reuse these prior results to gain context; do NOT redo the upfront analysis they already contain. "
+        "If a query tool is missing, fall back to reading the files directly.",
+        "",
+    ]
+    lines += [f"- {item}" for item in items]
+    return "\n".join(lines)

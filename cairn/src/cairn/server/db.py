@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS projects (
     reason_worker TEXT,
     reason_trigger TEXT,
     reason_started_at TEXT,
-    reason_last_heartbeat_at TEXT
+    reason_last_heartbeat_at TEXT,
+    project_root TEXT
 );
 
 CREATE TABLE IF NOT EXISTS facts (
@@ -156,6 +157,8 @@ def _ensure_project_columns(conn: sqlite3.Connection) -> None:
             )
     if "backend" not in columns:
         conn.execute("ALTER TABLE projects ADD COLUMN backend TEXT NOT NULL DEFAULT 'docker'")
+    if "project_root" not in columns:
+        conn.execute("ALTER TABLE projects ADD COLUMN project_root TEXT")
 
 
 @contextmanager

@@ -68,6 +68,8 @@ RUN sudo npm install -g @openai/codex@0.118.0
 RUN sudo npm install -g @anthropic-ai/claude-code@2.1.98
 RUN sudo npm install -g @mariozechner/pi-coding-agent@0.73.0
 RUN sudo npm install -g opencode-ai@1.17.8
+RUN pip3 install graphifyy --break-system-packages
+RUN sudo npm install -g @colbymchenry/codegraph
 
 RUN sudo chmod +x /usr/local/bin/kerbrute
 RUN mkdir -p /home/kali/.config/nuclei && \

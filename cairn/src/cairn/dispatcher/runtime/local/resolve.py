@@ -9,6 +9,8 @@ from pathlib import Path
 
 # worker type -> bare agent binary name
 BINARY = {"claudecode": "claude", "codex": "codex", "opencode": "opencode", "pi": "pi"}
+# host dependency tools the local engine needs (for project-knowledge queries)
+TOOLS = ("graphify", "codegraph")
 # binaries we will rewrite argv[0] for when seen bare (direct-argv drivers)
 DIRECT_BINARIES = set(BINARY.values())
 
@@ -137,3 +139,29 @@ def probe_engine(worker_type: str) -> dict:
     except (OSError, subprocess.SubprocessError):
         launchable = False
     return {"launchable": launchable, "path": resolved.path, "version": version, "source": resolved.source}
+
+
+def probe_tool(name: str) -> dict:
+    """Probe a bare host CLI tool (graphify / codegraph). Mirrors probe_engine
+    but without override/BINARY mapping."""
+    search = augmented_path(os.environ.get("PATH", ""))
+    found = None
+    if os.name == "nt":
+        for cand in _windows_candidates(name):
+            found = shutil.which(cand, path=search)
+            if found:
+                break
+    else:
+        found = shutil.which(name, path=search)
+    if not found:
+        return {"launchable": False, "path": None, "version": None}
+    version, launchable = None, False
+    try:
+        argv = launch_argv(Resolved(path=found, launcher=_launcher_for(found), source="path"), ["--version"])
+        out = subprocess.run(argv, capture_output=True, text=True, timeout=10)
+        launchable = out.returncode == 0
+        text = (out.stdout or out.stderr or "").strip()
+        version = text.splitlines()[0] if text else None
+    except (OSError, subprocess.SubprocessError):
+        launchable = False
+    return {"launchable": launchable, "path": found, "version": version}

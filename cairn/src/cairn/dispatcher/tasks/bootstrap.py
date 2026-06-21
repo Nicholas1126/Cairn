@@ -16,6 +16,7 @@ from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
     prepare_skills,
+    prepare_project_knowledge,
     ExecutionRecorder,
     model_env_key,
     best_effort_release,
@@ -53,7 +54,7 @@ def run_bootstrap_task(
     lease = HeartbeatLease.for_intent(client, project.project.id, intent.id, worker.name, config.runtime.interval)
     lease.start()
     try:
-        container_name = container_manager.ensure_running(project.project.id)
+        container_name = container_manager.ensure_running(project.project.id, project.project.project_root)
 
         if task_healthcheck_enabled(config):
             LOG.info(
@@ -110,7 +111,11 @@ def run_bootstrap_task(
 
         prompt = render_prompt(
             load_prompt(config.runtime.prompt_group, "bootstrap.md"),
-            {**_bootstrap_prompt_replacements(project), "skills": prepare_skills(container_manager, container_name)},
+            {
+                **_bootstrap_prompt_replacements(project),
+                "skills": prepare_skills(container_manager, container_name),
+                "project_knowledge": prepare_project_knowledge(project.project.project_root),
+            },
         )
 
         session = driver.prepare_session()
@@ -317,11 +322,15 @@ def _try_conclude_fallback(
         best_effort_release(client, project.project.id, intent.id, worker.name)
         return "failed"
 
-    container_name = container_manager.ensure_running(project.project.id)
+    container_name = container_manager.ensure_running(project.project.id, project.project.project_root)
 
     prompt = render_prompt(
         load_prompt(config.runtime.prompt_group, "bootstrap_conclude.md"),
-        {**_bootstrap_prompt_replacements(project), "skills": prepare_skills(container_manager, container_name)},
+        {
+            **_bootstrap_prompt_replacements(project),
+            "skills": prepare_skills(container_manager, container_name),
+            "project_knowledge": prepare_project_knowledge(project.project.project_root),
+        },
     )
     conclude_argv = driver.build_conclude(worker, prompt, session)
     LOG.info("starting bootstrap conclude fallback project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)

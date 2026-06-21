@@ -32,6 +32,8 @@ Normal return example:
 
 {skills}
 
+{project_knowledge}
+
 ## Current Intent
 ```
 {intent_id}

@@ -107,6 +107,7 @@ status          # "active" | "stopped" | "completed"
 bootstrap_enabled  # 是否允许消费者在初始态运行 bootstrap，默认 true
 created_at
 reason          # 当前项目级 reason lease，null 表示当前无人执行 reason
+project_root    # 宿主机绝对路径，指向项目根目录；null 表示未配置
 ```
 
 ### Project.reason
@@ -271,6 +272,7 @@ Body：
       "started_at": "2026-03-21T10:06:00Z",
       "last_heartbeat_at": "2026-03-21T10:06:03Z"
     },
+    "project_root": "/data/projects/target-app",
     "fact_count": 8,
     "intent_count": 5,
     "working_intent_count": 2,
@@ -286,6 +288,8 @@ Body：
 
 创建新项目。`origin` 和 `goal` 写入 `facts` 作为特殊 Fact。`hints` 可选。`bootstrap_enabled` 可选，默认为 `true`；为 `false` 时消费者跳过 bootstrap。即使为 `true`，消费者没有 bootstrap 能力时也可直接进入 reason。
 
+`project_root` 可选，默认为 `null`。若提供，必须是服务端宿主机上已存在的目录（绝对路径）；若路径不存在或不是目录，返回 `400`。
+
 Body：
 
 ```json
@@ -294,12 +298,17 @@ Body：
   "origin": "目标 http://192.168.1.10",
   "goal": "拿到 flag",
   "bootstrap_enabled": true,
+  "project_root": "/data/projects/target-app",
   "hints": [
     { "content": "优先看 web 服务", "creator": "human" },
     { "content": "注意 80 端口", "creator": "human" }
   ]
 }
 ```
+
+字段说明：
+
+- `project_root`：宿主机绝对路径，指向项目根目录；可选，默认 `null`
 
 ---
 
@@ -322,7 +331,8 @@ Body：
       "trigger": "new_facts",
       "started_at": "2026-03-21T10:06:00Z",
       "last_heartbeat_at": "2026-03-21T10:06:03Z"
-    }
+    },
+    "project_root": "/data/projects/target-app"
   },
   "facts": [
     { "id": "origin", "description": "目标 http://192.168.1.10" },
@@ -1070,6 +1080,44 @@ Body：
 Body：`multipart/form-data`，字段名 `file`，内容为 ZIP 文件。
 
 响应（`201 Created`）：导入的技能 SkillInfo。
+
+---
+
+## 工具探测
+
+### ToolInfo
+
+```
+name        # 工具标识（"graphify" 或 "codegraph"）
+launchable  # 宿主机上是否可调用（PATH 搜索 + 常见安装位置，版本探活退出码为 0 则为 true）
+version     # 探测到的版本字符串，未找到时为 null
+path        # 可执行文件绝对路径，未找到时为 null
+```
+
+---
+
+#### GET /tools
+
+探测宿主机上的依赖工具（`graphify`、`codegraph`）就绪状态，返回列表。探测逻辑与 `/engines` 同机（Server 宿主机视角）：搜索标准 `PATH` 及 npm prefix、Homebrew、nvm 等常见安装位置，找到后执行 `--version` 确认可调用。
+
+响应：
+
+```json
+[
+  {
+    "name": "graphify",
+    "launchable": true,
+    "version": "graphify 1.2.0",
+    "path": "/usr/local/bin/graphify"
+  },
+  {
+    "name": "codegraph",
+    "launchable": false,
+    "version": null,
+    "path": null
+  }
+]
+```
 
 ---
 

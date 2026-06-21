@@ -17,6 +17,7 @@ from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
     prepare_skills,
+    prepare_project_knowledge,
     ExecutionRecorder,
     model_env_key,
     best_effort_release_reason,
@@ -53,7 +54,7 @@ def run_reason_task(
     lease = HeartbeatLease.for_reason(client, project.project.id, worker.name, config.runtime.interval)
     lease.start()
     try:
-        container_name = container_manager.ensure_running(project.project.id)
+        container_name = container_manager.ensure_running(project.project.id, project.project.project_root)
 
         if task_healthcheck_enabled(config):
             LOG.info(
@@ -133,6 +134,7 @@ def run_reason_task(
                 "open_intents": format_open_intents(open_intents),
                 "max_intents": str(config.tasks.reason.max_intents),
                 "skills": prepare_skills(container_manager, container_name),
+                "project_knowledge": prepare_project_knowledge(project.project.project_root),
             },
         )
 

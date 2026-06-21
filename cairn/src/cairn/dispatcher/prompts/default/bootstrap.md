@@ -39,3 +39,5 @@ Only return the following after you have confirmed that Goal has been satisfied:
 ```
 
 {skills}
+
+{project_knowledge}
