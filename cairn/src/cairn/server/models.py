@@ -99,6 +99,13 @@ class EngineInfo(BaseModel):
     override: EngineOverride | None = None
 
 
+class ToolInfo(BaseModel):
+    name: str
+    launchable: bool
+    version: str | None = None
+    path: str | None = None
+
+
 class Fact(BaseModel):
     id: str
     description: str
@@ -140,6 +147,7 @@ class ProjectMeta(BaseModel):
     backend: Literal["docker", "local"] = "docker"
     created_at: str
     reason: ProjectReason | None = None
+    project_root: str | None = None
 
 
 class ProjectSummary(ProjectMeta):
@@ -177,6 +185,7 @@ class CreateProjectRequest(BaseModel):
     bootstrap_enabled: bool = True
     backend: Literal["docker", "local"] = "docker"
     hints: list[CreateHintInline] | None = None
+    project_root: str | None = None
 
     @field_validator("title", "origin", "goal")
     @classmethod
