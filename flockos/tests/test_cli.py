@@ -42,3 +42,15 @@ def test_start_foreground_invokes_uvicorn(tmp_path, monkeypatch):
     res = CliRunner().invoke(cli.main, ["start", "--foreground", "--port", "8123"])
     assert res.exit_code == 0
     assert called["port"] == 8123
+
+
+def test_start_builds_frontend_if_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "PID_FILE", tmp_path / "flockos.pid")
+    monkeypatch.setattr(cli, "FLOCK_STATIC", tmp_path / "static" / "flock")  # 不存在
+    built = {"n": 0}
+    monkeypatch.setattr(cli, "_ensure_frontend", lambda: built.__setitem__("n", built["n"] + 1))
+    monkeypatch.setattr(cli.uvicorn, "run", lambda *a, **k: None)
+    monkeypatch.setattr(cli, "build_app", lambda: object())
+    res = CliRunner().invoke(cli.main, ["start", "--foreground"])
+    assert res.exit_code == 0
+    assert built["n"] == 1
