@@ -22,7 +22,7 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--space-layout-md);
-  padding: var(--space-component-md) var(--space-layout-sm);
+  padding: 10px 16px;                  /* match cairn header height (px-4 py-2.5) */
   background: #ffffff;                 /* cairn: white header */
   border-bottom: 1px solid #e2e8f0;    /* slate-200 */
   box-shadow: var(--shadow-sm);
@@ -44,7 +44,7 @@
 
 .dashboard-title {
   margin: 0;
-  font-size: var(--font-size-h3);
+  font-size: 16px;                     /* match cairn title (text-base) */
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   letter-spacing: var(--letter-spacing-tight);
