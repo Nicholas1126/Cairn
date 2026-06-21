@@ -95,7 +95,7 @@ local 同理,`./project` 是软链接到 A。
 
 ### Dep-2 — 本地引擎依赖工具扫描 + `/engines` 页 UX 重排
 local 后端的工具装在宿主机,需检测就绪并提醒用户自行安装:
-- **后端探测**:复用 `runtime/local/resolve.py` 的解析(PATH + 增广目录 + `which` + `<bin> --version`)。新增一组"依赖工具"标识 `TOOLS = ("graphify", "codegraph")` 与 `probe_tool(name) -> {launchable, path, version, source}`(逻辑同 `probe_engine`,只是对裸工具名)。
+- **后端探测**:复用 `runtime/local/resolve.py` 的解析(PATH + 增广目录 + `which` + `<bin> --version`)。新增一组"依赖工具"标识 `TOOLS = ("graphify", "codegraph")` 与 `probe_tool(name) -> {launchable, path, version}`(逻辑同 `probe_engine`,只是对裸工具名;`ToolInfo` 无 `source` 字段)。
 - **接口**:新增 `GET /tools` → `list[ToolInfo{name, launchable, version, path}]`(server 复用 resolve,在 server 宿主机视角探测;与 `/engines` 同机即同宿主)。
 - **前端 `/engines` 页轻量重排**:分两组——
   - **Agents**:claude/codex/opencode/pi(现有 `/engines` 列表)。
