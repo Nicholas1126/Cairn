@@ -44,6 +44,8 @@ If Goal has not been satisfied and no new intent should currently be proposed, r
 {graph_yaml}
 ```
 
+{skills}
+
 ### Valid facts
 ```
 {fact_ids}

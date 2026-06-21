@@ -11,6 +11,8 @@ class _FakeRuntime:
         return "/fake/snap"
     def write_text_file(self, key, path, content):
         self.written.append((key, path, content))
+    def install_skills(self, key, skill_dirs):
+        pass
 
 
 def test_write_graph_snapshot_reference_uses_runtime_snapshot_root():

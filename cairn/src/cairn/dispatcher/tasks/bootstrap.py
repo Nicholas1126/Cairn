@@ -15,6 +15,7 @@ from cairn.dispatcher.runtime.cancellation import TaskCancellation
 from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.tasks.common import (
+    prepare_skills,
     ExecutionRecorder,
     model_env_key,
     best_effort_release,
@@ -109,7 +110,7 @@ def run_bootstrap_task(
 
         prompt = render_prompt(
             load_prompt(config.runtime.prompt_group, "bootstrap.md"),
-            _bootstrap_prompt_replacements(project),
+            {**_bootstrap_prompt_replacements(project), "skills": prepare_skills(container_manager, container_name)},
         )
 
         session = driver.prepare_session()
@@ -320,7 +321,7 @@ def _try_conclude_fallback(
 
     prompt = render_prompt(
         load_prompt(config.runtime.prompt_group, "bootstrap_conclude.md"),
-        _bootstrap_prompt_replacements(project),
+        {**_bootstrap_prompt_replacements(project), "skills": prepare_skills(container_manager, container_name)},
     )
     conclude_argv = driver.build_conclude(worker, prompt, session)
     LOG.info("starting bootstrap conclude fallback project=%s intent=%s worker=%s", project.project.id, intent.id, worker.name)

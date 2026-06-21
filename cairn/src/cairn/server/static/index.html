@@ -279,6 +279,10 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         Chat
       </button>
+      <button @click="location.hash = '/skills'" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5 shrink-0" title="Skills management">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 2 3 7l9 5 9-5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+        Skills
+      </button>
       <button @click="showLocalPrefs = true" class="h-7 max-w-40 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center shrink-0">
         <span class="truncate block" x-text="actorName()"></span>
       </button>
@@ -481,6 +485,96 @@
 
         <template x-if="!enginesLoading && engines.length === 0">
           <div class="text-center text-sm text-slate-400 py-10">No engines reported.</div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SKILLS VIEW ═══════════ -->
+<div x-show="view === 'skills'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+  <header class="bg-white/80 backdrop-blur border-b border-slate-200/60 px-4 py-2.5 flex items-center gap-3 shrink-0">
+    <button @click="location.hash = '/'" class="p-1.5 rounded-lg hover:bg-slate-100 transition text-slate-400 hover:text-slate-600" title="Back to projects">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <span class="font-semibold text-slate-700 tracking-tight">Skills</span>
+    <div class="flex-1"></div>
+    <label class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5 shrink-0 cursor-pointer">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+      <span>Upload .zip</span>
+      <input type="file" accept=".zip" class="hidden" @change="uploadSkillZip($event)">
+    </label>
+    <button @click="loadSkills()" :disabled="skillsLoading" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center gap-1.5 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed">
+      <svg class="w-3.5 h-3.5" :class="skillsLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      <span x-text="skillsLoading ? 'Refreshing...' : 'Refresh'"></span>
+    </button>
+  </header>
+
+  <div class="flex-1 overflow-y-auto p-4">
+    <div class="max-w-3xl mx-auto">
+      <p class="text-[11px] text-slate-400 mb-4">Enabled skills are injected into every project's agent workspace (.claude/skills) at run time.</p>
+
+      <!-- New skill -->
+      <div class="bg-white rounded-2xl border border-slate-200/60 p-5 mb-4">
+        <div class="text-[13px] font-semibold text-slate-700 mb-3">New skill</div>
+        <input type="text" x-model="skillNew.name" placeholder="skill-name"
+          class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 mb-2.5">
+        <textarea x-model="skillNew.content" placeholder="SKILL.md content (--- frontmatter with name/description ---)" rows="6"
+          class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 font-mono mb-2.5"></textarea>
+        <div class="flex justify-end">
+          <button @click="createSkill()" class="h-9 px-3 rounded-xl border border-brand-200 text-xs text-brand-600 hover:bg-brand-50 transition inline-flex items-center">
+            Create
+          </button>
+        </div>
+      </div>
+
+      <!-- List -->
+      <div class="space-y-3">
+        <template x-for="s in skills" :key="s.name">
+          <div class="bg-white rounded-2xl border border-slate-200/60 p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[15px] font-semibold text-slate-700" x-text="s.name"></span>
+                  <span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-[0.12em]"
+                    :class="s.enabled ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-slate-100 text-slate-500 border border-slate-200'"
+                    x-text="s.enabled ? 'enabled' : 'disabled'"></span>
+                </div>
+                <div class="mt-2 text-[11px] text-slate-400 break-words" x-text="s.description"></div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button @click="toggleSkill(s)" class="h-7 px-2.5 rounded-lg border text-xs transition inline-flex items-center"
+                  :class="s.enabled ? 'border-teal-200 text-teal-700 hover:bg-teal-50' : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'"
+                  x-text="s.enabled ? 'On' : 'Off'"></button>
+                <button @click="openSkill(s.name)" class="h-7 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center">
+                  Edit
+                </button>
+                <button @click="deleteSkill(s.name)" class="h-7 px-2.5 rounded-lg border border-rose-200 text-xs text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition inline-flex items-center">
+                  Delete
+                </button>
+              </div>
+            </div>
+
+            <template x-if="skillEdit && skillEdit.name === s.name">
+              <div class="mt-4 pt-4 border-t border-slate-100 space-y-2.5">
+                <textarea x-model="skillEdit.content" rows="14"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 font-mono"></textarea>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1"></div>
+                  <button @click="skillEdit = null" class="h-9 px-3 rounded-xl border border-slate-200 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition inline-flex items-center">
+                    Cancel
+                  </button>
+                  <button @click="saveSkill()" class="h-9 px-3 rounded-xl border border-brand-200 text-xs text-brand-600 hover:bg-brand-50 transition inline-flex items-center">
+                    Save
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <template x-if="!skillsLoading && skills.length === 0">
+          <div class="text-center text-sm text-slate-400 py-10">No skills yet.</div>
         </template>
       </div>
     </div>
@@ -1471,6 +1565,11 @@ function cairnApp() {
     enginesLoading: false,
     engineEdit: {},
 
+    skills: [],
+    skillsLoading: false,
+    skillEdit: null,
+    skillNew: { name: '', content: '' },
+
     chatWorkers: [],
     chatWorker: '',
     chatMessages: [],
@@ -1508,6 +1607,9 @@ function cairnApp() {
       } else if (hash === '#/chat' || hash === '#/chat/') {
         this.view = 'chat';
         this.loadChatWorkers();
+      } else if (hash === '#/skills' || hash === '#/skills/') {
+        this.view = 'skills';
+        this.loadSkills();
       } else {
         if (this.view !== 'list') this.backToList(true);
       }
@@ -1519,6 +1621,39 @@ function cairnApp() {
       finally { this.enginesLoading = false; }
     },
     _replaceEngine(e) { this.engines = this.engines.map(x => x.type === e.type ? e : x); },
+
+    async loadSkills() {
+      this.skillsLoading = true;
+      try { const r = await fetch('/skills'); if (r.ok) this.skills = await r.json(); }
+      finally { this.skillsLoading = false; }
+    },
+    async toggleSkill(s) {
+      const r = await fetch(`/skills/${s.name}/enabled`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: !s.enabled }) });
+      if (r.ok) { const u = await r.json(); this.skills = this.skills.map(x => x.name === u.name ? u : x); }
+    },
+    async openSkill(name) {
+      const r = await fetch(`/skills/${name}`); if (r.ok) this.skillEdit = await r.json();
+    },
+    async saveSkill() {
+      const r = await fetch(`/skills/${this.skillEdit.name}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(this.skillEdit) });
+      if (r.ok) { this.skillEdit = null; this.loadSkills(); }
+    },
+    async createSkill() {
+      const r = await fetch('/skills', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(this.skillNew) });
+      if (r.ok) { this.skillNew = { name: '', content: '' }; this.loadSkills(); }
+      else { const e = await r.json().catch(() => ({})); alert(e.detail || 'create failed'); }
+    },
+    async deleteSkill(name) {
+      if (!confirm('Delete skill ' + name + '?')) return;
+      const r = await fetch(`/skills/${name}`, { method: 'DELETE' }); if (r.ok) this.loadSkills();
+    },
+    async uploadSkillZip(ev) {
+      const f = ev.target.files[0]; if (!f) return;
+      const fd = new FormData(); fd.append('file', f);
+      const r = await fetch('/skills/upload', { method: 'POST', body: fd });
+      if (r.ok) this.loadSkills(); else { const e = await r.json().catch(() => ({})); alert(e.detail || 'upload failed'); }
+      ev.target.value = '';
+    },
 
     async loadChatWorkers() {
       this.chatError = '';

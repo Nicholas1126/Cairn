@@ -12,6 +12,8 @@ from cairn.dispatcher.runtime.containers import ContainerManager
 from cairn.dispatcher.runtime.heartbeat import HeartbeatLease
 from cairn.dispatcher.runtime.process import ProcessResult
 from cairn.execlog import redact_command, redact_text, truncate_head_tail
+from cairn import skills_store
+from cairn.dispatcher.prompting import format_skills
 
 HEALTHCHECK_COMMUNICATE_GRACE_SECONDS = 10
 PROCESS_COMMUNICATE_GRACE_SECONDS = 15
@@ -20,6 +22,20 @@ GRAPH_SNAPSHOT_ROOT = "/tmp/cairn-prompts"
 FILE_SHIP_CAP = 10_000_000   # ship at most ~10MB when files are on (server caps file too)
 NOFILE_SHIP_CAP = 64 * 1024  # ship only inline-sized output when files are off
 LOG = logging.getLogger(__name__)
+
+
+def prepare_skills(runtime, workspace_key: str) -> str:
+    """Install enabled skills into the workspace and return the {skills} prompt text.
+
+    Best-effort: install failures must not break the task; an empty enabled set
+    installs nothing and renders an empty {skills} placeholder.
+    """
+    metas = [m for m in skills_store.list_skills() if m.enabled]
+    try:
+        runtime.install_skills(workspace_key, skills_store.enabled_skill_dirs())
+    except Exception:
+        LOG.warning("skill install failed for %s", workspace_key)
+    return format_skills(metas)
 
 
 def utcnow_iso() -> str:

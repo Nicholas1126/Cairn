@@ -30,6 +30,8 @@ Normal return example:
 {graph_yaml}
 ```
 
+{skills}
+
 ## Current Intent
 ```
 {intent_id}

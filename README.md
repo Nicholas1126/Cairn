@@ -224,6 +224,14 @@ Supported `launcher` values: `direct` (default on macOS/Linux), `cmd`, `powershe
 
 Local agents run as the host user with no filesystem or network sandbox, share host resources, and cannot access the security tools bundled in the Docker image. Use Docker mode when isolation matters.
 
+### Skills
+
+Bundled skills in the `skills/` directory are seeded into `~/.cairn/skills/` on first startup. Manage them at `#/skills` in the web UI — list, enable/disable, edit, create, upload a zip, or delete.
+
+Enabled skills are automatically injected into every project's agent workspace (`.claude/skills/`) at task start, for both Docker and local backends. Claude discovers them natively; other workers (Codex, opencode, Pi) receive them via the `{skills}` prompt directive.
+
+**Deployment note:** a containerized dispatcher needs `~/.cairn` mounted so it can read skills from the host.
+
 ### Tests
 
 Run the fast regression suite without Docker or live model endpoints:

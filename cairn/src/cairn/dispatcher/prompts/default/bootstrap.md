@@ -37,3 +37,5 @@ Only return the following after you have confirmed that Goal has been satisfied:
 ```
 {hints}
 ```
+
+{skills}

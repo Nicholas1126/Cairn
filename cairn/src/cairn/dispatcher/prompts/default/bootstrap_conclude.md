@@ -40,3 +40,5 @@ Normal return example:
 ```
 {hints}
 ```
+
+{skills}

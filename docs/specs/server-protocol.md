@@ -945,6 +945,134 @@ intents:
 
 ---
 
+## 技能管理
+
+技能（Skill）是注入给 Agent 工作区的 markdown 指南文件，在任务派发时通过 `{skills}` 占位符渲染到 prompt 中。服务端将技能存储于 `~/.cairn/skills/` 目录，并以 `.registry.json` 文件跟踪各技能的启用状态；启动时若 `~/.cairn/skills/` 为空，则自动将代码库 `skills/` 目录中的内置技能种入该目录。
+
+### SkillInfo
+
+```
+name          # 技能唯一标识（目录名，仅允许字母、数字、.、_、-）
+description   # 技能描述（从 SKILL.md 前置 front matter 中解析）
+enabled       # 是否启用
+```
+
+### SkillContent
+
+```
+name          # 技能唯一标识
+content       # 技能正文（SKILL.md 完整内容）
+```
+
+---
+
+#### GET /skills
+
+返回所有技能列表。
+
+响应：
+
+```json
+[
+  {
+    "name": "sql-injection",
+    "description": "SQL 注入漏洞识别与利用指南",
+    "enabled": true
+  }
+]
+```
+
+---
+
+#### GET /skills/{name}
+
+返回单个技能的详情，含完整正文。
+
+响应：
+
+```json
+{
+  "name": "sql-injection",
+  "content": "---\ndescription: SQL 注入漏洞识别与利用指南\n---\n..."
+}
+```
+
+---
+
+#### POST /skills
+
+创建新技能。`name` 只允许字母、数字、`.`、`_`、`-`；同名技能已存在时返回 `400`。
+
+Body：
+
+```json
+{
+  "name": "sql-injection",
+  "content": "---\ndescription: SQL 注入漏洞识别与利用指南\n---\n..."
+}
+```
+
+响应（`201 Created`）：创建后的 SkillInfo，`enabled` 默认为 `true`。
+
+---
+
+#### PUT /skills/{name}
+
+更新技能正文（以 SKILL.md 完整内容替换）。
+
+Body：
+
+```json
+{
+  "name": "sql-injection",
+  "content": "---\ndescription: SQL 注入漏洞识别与利用指南（更新版）\n---\n..."
+}
+```
+
+响应：更新后的 SkillInfo。
+
+---
+
+#### PUT /skills/{name}/enabled
+
+启用或禁用指定技能。已启用的技能在下次任务派发时注入工作区，已禁用的技能跳过注入。
+
+Body：
+
+```json
+{
+  "enabled": false
+}
+```
+
+响应：更新后的 SkillInfo。
+
+---
+
+#### DELETE /skills/{name}
+
+删除技能目录及其所有文件，并从 `.registry.json` 中移除对应记录。
+
+响应：
+
+```json
+{
+  "deleted": "sql-injection"
+}
+```
+
+---
+
+#### POST /skills/upload
+
+通过上传 ZIP 压缩包导入技能。ZIP 必须包含恰好一个顶层目录（目录名即技能 `name`），且该目录内必须含有 `SKILL.md`；若同名技能已存在则覆盖。
+
+Body：`multipart/form-data`，字段名 `file`，内容为 ZIP 文件。
+
+响应（`201 Created`）：导入的技能 SkillInfo。
+
+---
+
 ## 消费者典型使用流程
 
 ```

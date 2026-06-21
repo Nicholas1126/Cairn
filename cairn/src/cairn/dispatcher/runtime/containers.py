@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 import tarfile
 import threading
 import uuid
@@ -224,6 +224,26 @@ class ContainerManager:
             raise RuntimeError(f"failed to write container file {path}: {exc}") from exc
         if not ok:
             raise RuntimeError(f"failed to write container file {path}")
+
+    _WORKSPACE_DIR = "/home/kali/workspace"
+
+    def install_skills(self, container_name: str, skill_dirs: list) -> None:
+        dirs = [Path(s) for s in skill_dirs if Path(s).is_dir()]
+        if not dirs:
+            return
+        container = self._require_container(container_name)
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tar:
+            for src in dirs:
+                tar.add(str(src), arcname=f".claude/skills/{src.name}")
+        try:
+            container.exec_run(["mkdir", "-p", f"{self._WORKSPACE_DIR}/.claude/skills"],
+                               stdout=False, stderr=False)
+            ok = container.put_archive(self._WORKSPACE_DIR, buf.getvalue())
+        except DockerException as exc:
+            raise RuntimeError(f"failed to install skills: {exc}") from exc
+        if not ok:
+            raise RuntimeError("failed to install skills (put_archive returned False)")
 
     def remove_container(self, name: str, *, force: bool = True) -> None:
         container = self._get_container(name)

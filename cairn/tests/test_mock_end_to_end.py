@@ -170,6 +170,9 @@ class LocalContainerManager:
     def snapshot_root(self) -> str:
         return "/tmp/cairn-prompts"
 
+    def install_skills(self, container_name, skill_dirs):
+        pass
+
     def needs_completed_cleanup(self, _project_id: str) -> bool:
         return False
 
