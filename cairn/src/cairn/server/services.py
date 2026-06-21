@@ -212,6 +212,7 @@ def project_meta_from_row(row: sqlite3.Row) -> ProjectMeta:
         backend=row["backend"],
         created_at=row["created_at"],
         reason=project_reason_from_row(row),
+        project_root=row["project_root"] if "project_root" in row.keys() else None,
     )
 
 

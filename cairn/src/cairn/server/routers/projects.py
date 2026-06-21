@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, HTTPException
 
 from cairn.server import execstore
@@ -82,10 +84,13 @@ def create_project(body: CreateProjectRequest):
         pid = next_project_id(conn)
         now = utcnow()
 
+        if body.project_root is not None and not os.path.isdir(body.project_root):
+            raise HTTPException(400, f"project_root is not an existing directory: {body.project_root}")
+
         conn.execute(
-            "INSERT INTO projects (id, title, status, bootstrap_enabled, backend, created_at) "
-            "VALUES (?, ?, 'active', ?, ?, ?)",
-            (pid, body.title, body.bootstrap_enabled, body.backend, now),
+            "INSERT INTO projects (id, title, status, bootstrap_enabled, backend, created_at, project_root) "
+            "VALUES (?, ?, 'active', ?, ?, ?, ?)",
+            (pid, body.title, body.bootstrap_enabled, body.backend, now, body.project_root),
         )
         conn.execute(
             "INSERT INTO facts (id, project_id, description) VALUES (?, ?, ?)",
@@ -115,6 +120,7 @@ def create_project(body: CreateProjectRequest):
                 backend=body.backend,
                 created_at=now,
                 reason=None,
+                project_root=body.project_root,
             ),
             facts=[
                 Fact(id="origin", description=body.origin),
