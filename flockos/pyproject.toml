@@ -1,0 +1,25 @@
+[project]
+name = "flockos-integration"
+version = "0.1.0"
+description = "FlockOS integration layer: CairnAgentEngine + unified web + launcher"
+requires-python = ">=3.12"
+dependencies = [
+    "cairn",
+    "flock-core",
+    "click>=8.1",
+    "uvicorn[standard]>=0.34",
+]
+
+[project.scripts]
+flockos = "flockos.cli:main"
+
+[tool.uv.sources]
+cairn = { workspace = true }
+flock-core = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "flockos"
+
+[build-system]
+requires = ["uv_build>=0.8.9,<0.9.0"]
+build-backend = "uv_build"

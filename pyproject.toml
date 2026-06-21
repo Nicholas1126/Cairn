@@ -1,0 +1,25 @@
+[project]
+name = "flockos-workspace"
+version = "0.1.0"
+description = "FlockOS — Flock orchestration + Cairn hypergraph verification (workspace root)"
+requires-python = ">=3.12"
+dependencies = [
+    "cairn",
+    "flock-core",
+    "flockos-integration",
+]
+
+[tool.uv.sources]
+cairn = { workspace = true }
+flock-core = { workspace = true }
+flockos-integration = { workspace = true }
+
+[tool.uv.workspace]
+members = ["cairn", "flock", "flockos"]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
