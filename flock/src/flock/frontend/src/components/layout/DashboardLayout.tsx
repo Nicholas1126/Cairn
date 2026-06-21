@@ -240,7 +240,13 @@ const DashboardLayout: React.FC = () => {
             </svg>
           </button>
 
-          <a href="/cairn" title="Cairn 控制台" style={{ marginLeft: 'auto', fontSize: 13, opacity: 0.85, textDecoration: 'none' }}>Cairn 控制台 →</a>
+          <div className="system-group">
+            <span className="header-divider" aria-hidden="true" />
+            <a className="system-pill" href="/cairn#/engines" title="Engine management">Engines</a>
+            <a className="system-pill" href="/cairn#/chat" title="Engine chat / debug">Chat</a>
+            <a className="system-pill" href="/cairn#/skills" title="Skills management">Skills</a>
+            <a className="cairn-console-link" href="/cairn" title="Cairn 控制台">Cairn 控制台 →</a>
+          </div>
 
           <Header />
         </div>
