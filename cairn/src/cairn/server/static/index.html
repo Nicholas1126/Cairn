@@ -1219,6 +1219,9 @@
         <input type="checkbox" x-model="newProject.localEngine" class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-200">
         <span>Local Engine</span>
       </label>
+      <input x-model="newProject.projectRoot" placeholder="Project root (host path, optional) — e.g. /data/A"
+        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 transition placeholder:text-slate-300 font-mono">
+      <p class="text-[11px] text-slate-400 -mt-1">Read-only prior analysis (src-repo / docs-out / graphify-out / scan-out / codegraph-out) mounted at ./project.</p>
 
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -1525,7 +1528,7 @@ function cairnApp() {
     exportProjectId: '',
     showDeleteModal: false,
 
-    newProject: { title: '', origin: '', goal: '', bootstrap: true, localEngine: false, hints: [{ content: '' }] },
+    newProject: { title: '', origin: '', goal: '', bootstrap: true, localEngine: false, projectRoot: '', hints: [{ content: '' }] },
     intentForm: { description: '' },
     concludeForm: { description: '', intentId: '' },
     completeForm: { description: '' },
@@ -3872,11 +3875,13 @@ function cairnApp() {
           bootstrap_enabled: this.newProject.bootstrap,
           backend: this.newProject.localEngine ? 'local' : 'docker'
         };
+        const pr = this.newProject.projectRoot?.trim();
+        if (pr) body.project_root = pr;
         const hints = hintContents.map(h => ({ content: h.content.trim(), creator: actor }));
         if (hints.length > 0) body.hints = hints;
         const data = await this.api('POST', '/projects', body);
         this.showNewProject = false;
-        this.newProject = { title:'', origin:'', goal:'', bootstrap: true, localEngine: false, hints: [{ content:'' }] };
+        this.newProject = { title:'', origin:'', goal:'', bootstrap: true, localEngine: false, projectRoot:'', hints: [{ content:'' }] };
         await this.loadProjects();
         await this.openProject(data.project.id);
         this.showToast('Project created');
