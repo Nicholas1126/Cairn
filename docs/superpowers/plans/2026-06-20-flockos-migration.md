@@ -41,7 +41,7 @@
 ## File Structure
 
 - `pyproject.toml`(**新建**,仓库根):uv workspace,成员 `cairn` / `flock` / `flockos`。
-- `flock/`(**新建**,移植):`flock/src/flock/...` + `flock/pyproject.toml` + `flock/frontend/` + `flock/tests/` + `flock/examples/`。
+- `flock/`(**新建**,移植):`flock/src/flock/...` + `flock/pyproject.toml` + `flock/src/flock/frontend/` + `flock/tests/` + `flock/examples/`。
 - `flockos/`(**新建**):
   - `flockos/pyproject.toml` — 依赖 `cairn` + `flock-core`。
   - `flockos/src/flockos/__init__.py`
@@ -69,7 +69,7 @@ rsync -a --exclude '.git' --exclude 'graphify-out' --exclude '.beads' \
   --exclude '__pycache__' --exclude '.venv' --exclude 'node_modules' \
   --exclude 'frontend/dist' --exclude '.pytest_cache' \
   /Users/nicholas/project/ai/flock/ flock/
-ls flock/src/flock/core/orchestrator.py flock/pyproject.toml flock/frontend/package.json
+ls flock/src/flock/core/orchestrator.py flock/pyproject.toml flock/src/flock/frontend/package.json
 ```
 Expected: 三个路径都存在(复制成功)。
 
@@ -887,29 +887,29 @@ git commit -m "feat(flockos): unified app (cairn root + flock at /flock + /cairn
 ### Task 9: flock 前端预构建(base/API/ws)+ 跳转入口 + 主题贴近 cairn
 
 **Files:**
-- Modify: `flock/frontend/vite.config.ts`(设 `base: '/flock/'`)
-- Modify: `flock/frontend/src/services/api.ts`(API base 默认 `/flock/api`)
+- Modify: `flock/src/flock/frontend/vite.config.ts`(设 `base: '/flock/'`)
+- Modify: `flock/src/flock/frontend/src/services/api.ts`(API base 默认 `/flock/api`)
 - Modify: flock 前端 websocket URL 构造处(指向 `/flock/ws`,具体文件见下)
 - Modify: flock 前端顶栏组件(加"进入 Cairn"链接 → `/cairn`)
 - Create: `flockos/static/flock/`(构建产物)
 
 - [ ] **Step 1: 设 Vite base**
 
-`flock/frontend/vite.config.ts` 在 `defineConfig({...})` 顶层加入(若已有 base 则改值):
+`flock/src/flock/frontend/vite.config.ts` 在 `defineConfig({...})` 顶层加入(若已有 base 则改值):
 ```ts
   base: '/flock/',
 ```
 
 - [ ] **Step 2: API base 默认指向 `/flock/api`**
 
-`flock/frontend/src/services/api.ts` 第 12 行:
+`flock/src/flock/frontend/src/services/api.ts` 第 12 行:
 ```ts
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/flock/api';
 ```
 
 - [ ] **Step 3: WebSocket URL 指向 `/flock/ws`**
 
-打开 `flock/frontend/src/services/websocket.ts`,定位构造 `url`(传给 `new WebSocketClient(url)`/`new WebSocket(this.url)`)的位置,把其路径部分改为 `/flock/ws`(保留 `ws://`/`wss://` + host 推导逻辑)。例如把默认路径常量改为:
+打开 `flock/src/flock/frontend/src/services/websocket.ts`,定位构造 `url`(传给 `new WebSocketClient(url)`/`new WebSocket(this.url)`)的位置,把其路径部分改为 `/flock/ws`(保留 `ws://`/`wss://` + host 推导逻辑)。例如把默认路径常量改为:
 ```ts
 const WS_PATH = import.meta.env.VITE_WS_PATH || '/flock/ws';
 ```
@@ -919,11 +919,11 @@ const WS_PATH = import.meta.env.VITE_WS_PATH || '/flock/ws';
 
 - [ ] **Step 4: 顶栏加"进入 Cairn"入口 + 轻量主题贴近 cairn**
 
-在 flock 前端顶栏/头部组件(在 `flock/frontend/src/` 下搜索渲染标题栏的组件,如 `App.tsx` 或 `components/` 中的 header)加入一个链接:
+在 flock 前端顶栏/头部组件(在 `flock/src/flock/frontend/src/` 下搜索渲染标题栏的组件,如 `App.tsx` 或 `components/` 中的 header)加入一个链接:
 ```tsx
 <a href="/cairn" className="flockos-cairn-link">Cairn 控制台 →</a>
 ```
-主题:为"轻微改动界面",在 `flock/frontend/src/styles/variables.css` 覆盖主色为 cairn 的 slate 浅色系(与 cairn `index.html` 的 `slate-*` 一致),例如把主背景/主文字/强调色变量改为浅色 slate 值(具体变量名以该文件为准,改 3-5 个根变量即可)。
+主题:为"轻微改动界面",在 `flock/src/flock/frontend/src/styles/variables.css` 覆盖主色为 cairn 的 slate 浅色系(与 cairn `index.html` 的 `slate-*` 一致),例如把主背景/主文字/强调色变量改为浅色 slate 值(具体变量名以该文件为准,改 3-5 个根变量即可)。
 
 - [ ] **Step 5: 构建到 `flockos/static/flock`**
 
@@ -932,10 +932,10 @@ Run:
 cd /Users/nicholas/project/ai/Cairn/flock/frontend
 npm install
 npm run build
-rm -rf ../../flockos/static/flock
-mkdir -p ../../flockos/static/flock
-cp -R dist/* ../../flockos/static/flock/
-ls ../../flockos/static/flock/index.html
+rm -rf ../../../../flockos/static/flock
+mkdir -p ../../../../flockos/static/flock
+cp -R dist/* ../../../../flockos/static/flock/
+ls ../../../../flockos/static/flock/index.html
 ```
 Expected: `index.html` 存在(产物就位)。
 
@@ -947,7 +947,7 @@ Expected: PASS,且 `GET /flock/` 返回 200(看板 index)。
 - [ ] **Step 7: 提交**
 
 ```bash
-git add flock/frontend/vite.config.ts flock/frontend/src/services/api.ts flock/frontend/src/services/websocket.ts flock/frontend/src/styles/variables.css flock/frontend/src flockos/static/flock
+git add flock/src/flock/frontend/vite.config.ts flock/src/flock/frontend/src/services/api.ts flock/src/flock/frontend/src/services/websocket.ts flock/src/flock/frontend/src/styles/variables.css flock/src/flock/frontend/src flockos/static/flock
 git commit -m "feat(flockos): flock frontend under /flock (base/api/ws) + Cairn entry + cairn-like theme"
 ```
 
@@ -1169,7 +1169,7 @@ Expected: FAIL(`_ensure_frontend`/`FLOCK_STATIC` 未定义)。
 在 `flockos/src/flockos/cli.py` 增加常量与函数,并在 `start` 函数体首行(`PID_FILE.parent.mkdir` 之前)调用 `_ensure_frontend()`:
 ```python
 FLOCK_STATIC = Path(__file__).resolve().parents[2] / "static" / "flock"
-FLOCK_FRONTEND = Path(__file__).resolve().parents[3] / "flock" / "frontend"
+FLOCK_FRONTEND = Path(__file__).resolve().parents[3] / "flock" / "src" / "flock" / "frontend"
 
 
 def _ensure_frontend() -> None:
