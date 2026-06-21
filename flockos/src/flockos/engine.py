@@ -5,9 +5,11 @@ in-process on the host instead of calling an HTTP gateway."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from cairn.dispatcher.config import WorkerConfig
+from pydantic import BaseModel
 from cairn.dispatcher.runtime.local.process import LocalManagedProcess
 from cairn.dispatcher.workers.registry import get_driver
 from flock.components.agent.base import EngineComponent
@@ -101,3 +103,45 @@ class CairnAgentEngine(EngineComponent):
             state=dict(inputs.state),
             logs=[f"CairnAgentEngine failed to produce valid {model_cls.__name__}: {last_error}"],
         )
+
+
+class CairnConfig(BaseModel):
+    """Alias -> Cairn WorkerConfig mapping for cairn_agent()."""
+
+    workers: dict[str, WorkerConfig] = {}
+    default_timeout: int = 600
+    default_retries: int = 1
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    @classmethod
+    def from_dispatch(cls, path: str | Path, **kw) -> "CairnConfig":
+        from cairn.dispatcher.config import DispatchConfig
+
+        dispatch = DispatchConfig.load(Path(path).expanduser())
+        return cls(workers={w.name: w for w in dispatch.workers}, **kw)
+
+    def build_engine(
+        self,
+        alias: str,
+        *,
+        timeout: int | None = None,
+        retries: int | None = None,
+        cwd: str | None = None,
+    ) -> CairnAgentEngine:
+        if alias not in self.workers:
+            raise ValueError(f"unknown cairn worker alias: {alias!r}")
+        return CairnAgentEngine(
+            worker=self.workers[alias],
+            timeout=timeout if timeout is not None else self.default_timeout,
+            retries=retries if retries is not None else self.default_retries,
+            cwd=cwd,
+        )
+
+
+def cairn_agent(flock, config: CairnConfig, alias: str, name: str):
+    """Mirror of Flock.openclaw_agent: build an AgentBuilder pre-wired with a
+    CairnAgentEngine for the given worker alias."""
+    builder = flock.agent(name)
+    builder.with_engines(config.build_engine(alias))
+    return builder

@@ -156,3 +156,29 @@ async def test_evaluate_returns_empty_with_error_after_retries(monkeypatch):
     assert result.artifacts == []
     # EvalResult has no `errors` field — error message is stored in logs
     assert any("Pizza" in e for e in result.logs)
+
+
+from flockos.engine import CairnConfig, cairn_agent
+
+
+def test_cairn_config_resolves_worker_by_alias():
+    cfg = CairnConfig(workers={"claude": _claude_worker()})
+    eng = cfg.build_engine("claude", timeout=42)
+    assert isinstance(eng, CairnAgentEngine)
+    assert eng.worker.type == "claudecode"
+    assert eng.timeout == 42
+
+
+def test_cairn_config_unknown_alias_raises():
+    cfg = CairnConfig(workers={})
+    with pytest.raises(ValueError):
+        cfg.build_engine("nope")
+
+
+def test_cairn_agent_helper_attaches_engine():
+    flock = Flock("test")
+    cfg = CairnConfig(workers={"claude": _claude_worker()})
+    agent = cairn_agent(flock, cfg, "claude", "chef").consumes(Idea).publishes(Pizza)
+    built = agent  # AgentBuilder (PublishBuilder wraps it, ._agent is the real Agent)
+    # with_engines stores into self._agent.engines (verified via AgentBuilder.with_engines source)
+    assert any(isinstance(e, CairnAgentEngine) for e in built._agent.engines)
