@@ -23,8 +23,8 @@
   align-items: center;
   gap: var(--space-layout-md);
   padding: var(--space-component-md) var(--space-layout-sm);
-  background: var(--color-bg-surface);
-  border-bottom: var(--border-subtle);
+  background: #ffffff;                 /* cairn: white header */
+  border-bottom: 1px solid #e2e8f0;    /* slate-200 */
   box-shadow: var(--shadow-sm);
   z-index: 100;
 }
@@ -32,8 +32,8 @@
 .filter-pills-bar {
   position: relative;
   padding: var(--spacing-1-5) var(--space-layout-md);
-  background: color-mix(in srgb, var(--color-bg-overlay) 65%, transparent);
-  border-bottom: var(--border-subtle);
+  background: #f8fafc;                 /* cairn: very-light slate */
+  border-bottom: 1px solid #e2e8f0;    /* slate-200 */
   backdrop-filter: blur(var(--blur-sm));
   min-height: 0;
   display: flex;
