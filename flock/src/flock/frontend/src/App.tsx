@@ -21,12 +21,13 @@ const App: React.FC = () => {
   useEffect(() => {
     const resolveWebSocketUrl = (): string => {
       const explicit = import.meta.env.VITE_WS_URL;
+      const WS_PATH = import.meta.env.VITE_WS_PATH || '/flock/ws';
 
       // 1) If explicitly configured, respect it (backwards compatible)
       if (explicit && explicit.trim().length > 0) {
         const trimmed = explicit.trim();
 
-        // Support both absolute ws(s):// URLs and relative paths like "/ws"
+        // Support both absolute ws(s):// URLs and relative paths like "/flock/ws"
         if (trimmed.startsWith('ws://') || trimmed.startsWith('wss://')) {
           return trimmed;
         }
@@ -40,18 +41,18 @@ const App: React.FC = () => {
         }
 
         // Fallback for non-browser environments (tests, SSR)
-        return 'ws://localhost:8344/ws';
+        return `ws://localhost:8344${WS_PATH}`;
       }
 
       // 2) No explicit config: derive from current location (Codespaces / tunnels safe)
       if (typeof window !== 'undefined') {
         const { protocol, host } = window.location;
         const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
-        return `${wsProtocol}//${host}/ws`;
+        return `${wsProtocol}//${host}${WS_PATH}`;
       }
 
       // 3) Ultimate fallback for non-browser environments
-      return 'ws://localhost:8344/ws';
+      return `ws://localhost:8344${WS_PATH}`;
     };
 
     const startMark = 'app-initial-render-start';

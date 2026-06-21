@@ -240,6 +240,8 @@ const DashboardLayout: React.FC = () => {
             </svg>
           </button>
 
+          <a href="/cairn" title="Cairn 控制台" style={{ marginLeft: 'auto', fontSize: 13, opacity: 0.85, textDecoration: 'none' }}>Cairn 控制台 →</a>
+
           <Header />
         </div>
       </header>

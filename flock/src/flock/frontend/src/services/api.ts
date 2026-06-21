@@ -9,7 +9,7 @@
 
 import type { ArtifactSummary } from '../types/filters';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/flock/api';
 
 export interface ArtifactType {
   name: string;
