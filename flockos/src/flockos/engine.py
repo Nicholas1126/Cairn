@@ -4,6 +4,7 @@ in-process on the host instead of calling an HTTP gateway."""
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from cairn.dispatcher.config import WorkerConfig
@@ -37,3 +38,46 @@ class CairnAgentEngine(EngineComponent):
         proc.start()
         res = proc.communicate(timeout=timeout)
         return res.stdout, res.stderr, res.returncode
+
+    def _build_prompt(self, agent: Any, inputs, output_group) -> str:
+        decl = output_group.outputs[0]
+        schema = decl.spec.model.model_json_schema()
+        input_payloads = [dict(a.payload) for a in inputs.artifacts]
+        description = (getattr(agent, "description", "") or "").strip()
+        lines = [
+            "Your ENTIRE response must be a single valid JSON object matching the schema below.",
+            "Do not include any text, explanation, markdown fences, or commentary — only the raw JSON object.",
+            "The response will be parsed directly by a JSON schema validator.",
+        ]
+        if description:
+            lines.append(f"Task: {description}")
+        lines.append(f"Schema: {json.dumps(schema, ensure_ascii=False)}")
+        if len(input_payloads) == 1:
+            lines.append(f"Input: {json.dumps(input_payloads[0], ensure_ascii=False)}")
+        else:
+            lines.append(f"Inputs: {json.dumps(input_payloads, ensure_ascii=False)}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _extract_json(text: str) -> dict:
+        text = text.strip()
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end < start:
+            raise ValueError("no JSON object found in agent output")
+        return json.loads(text[start : end + 1])
+
+    async def evaluate(self, agent, ctx, inputs, output_group) -> EvalResult:
+        if not inputs.artifacts or not output_group.outputs:
+            return EvalResult.empty(state=dict(inputs.state))
+
+        model_cls = output_group.outputs[0].spec.model
+        driver = get_driver(self.worker.type)
+        prompt = self._build_prompt(agent, inputs, output_group)
+
+        argv, session = self._build_argv(prompt)
+        stdout, stderr, rc = self._run(argv, {}, self.cwd, self.timeout)
+        text = driver.extract_response_text(stdout, stderr)
+        data = self._extract_json(text)
+        instance = model_cls(**data)
+        return EvalResult.from_object(instance, agent=agent)

@@ -54,3 +54,41 @@ def test_run_invokes_local_process(monkeypatch):
     # env 必须把 worker.env 合并进去
     assert captured["env"]["ANTHROPIC_MODEL"] == "m"
     assert captured["env"]["K"] == "V"
+
+
+import json
+from pydantic import BaseModel
+from flock.core.orchestrator import Flock
+
+
+class Idea(BaseModel):
+    topic: str
+
+
+class Pizza(BaseModel):
+    name: str
+    toppings: list[str]
+
+
+@pytest.mark.asyncio
+async def test_evaluate_parses_agent_json_into_output_type(monkeypatch):
+    flock = Flock("test")
+    agent = (
+        flock.agent("chef")
+        .consumes(Idea)
+        .publishes(Pizza)
+        .with_engines(CairnAgentEngine(worker=_claude_worker()))
+    )
+
+    def fake_run(self, argv, extra_env, cwd, timeout):
+        # prompt 应包含输入 payload 与输出 schema
+        prompt = argv[-1]
+        assert "topic" in prompt and "toppings" in prompt
+        return (json.dumps({"name": "Margherita", "toppings": ["basil"]}), "", 0)
+
+    monkeypatch.setattr(CairnAgentEngine, "_run", fake_run)
+
+    artifacts = await flock.invoke(agent, Idea(topic="classic"))
+    assert len(artifacts) == 1
+    assert artifacts[0].payload["name"] == "Margherita"
+    assert artifacts[0].payload["toppings"] == ["basil"]
