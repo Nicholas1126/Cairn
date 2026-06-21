@@ -1,0 +1,146 @@
+# Flock Quality Gates CI/CD
+# Runs comprehensive quality checks on all pull requests and pushes
+# Matches pre-commit hooks with additional test coverage requirements
+
+name: Quality Gates
+
+on:
+  push:
+    branches:
+      - main # Replace with your default branch
+      - 0.5.0b
+  pull_request:
+    branches:
+      - main # Replace with your default branch
+      - 0.5.0b
+
+jobs:
+  # Backend quality checks
+  backend-quality:
+    name: Backend Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install UV
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dependencies
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv sync --dev --all-groups --all-extras
+
+      - name: Lint with Ruff
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv run ruff check src/flock/ --fix --exit-zero
+
+      - name: Format check with Ruff
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv run ruff format --check src/flock/
+
+      - name: Run tests with coverage
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv run pytest --cov=src/flock --cov-branch --cov-report=xml --cov-report=term --cov-fail-under=75
+
+      - name: Extract test metrics
+        id: test-metrics
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+
+          # Count total tests
+          TEST_COUNT=$(uv run pytest --collect-only -q | tail -n 1 | awk '{print $1}')
+          echo "test_count=$TEST_COUNT" >> $GITHUB_OUTPUT
+          echo "📊 Total tests: $TEST_COUNT"
+
+          # Extract coverage percentage from XML
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(f\"{float(root.attrib['line-rate']) * 100:.0f}\")")
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "📈 Coverage: $COVERAGE%"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+      - name: Backend build check
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv build
+
+  # Frontend quality checks
+  frontend-quality:
+    name: Frontend Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/flock/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: src/flock/frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: src/flock/frontend
+        run: npm run type-check
+
+      - name: Run tests
+        working-directory: src/flock/frontend
+        run: npm test
+
+      # Coverage disabled until vitest.config.ts is properly configured
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     file: ./frontend/coverage/coverage-final.json
+      #     flags: frontend
+      #     name: frontend-coverage
+
+      - name: Frontend build check
+        working-directory: src/flock/frontend
+        run: npm run build
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install UV
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dependencies
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv sync --dev --all-groups --all-extras
+
+      - name: Run Bandit security scan
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv run bandit -c pyproject.toml -r src/flock/ -ll

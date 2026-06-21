@@ -1,0 +1,404 @@
+# 🧪 Miscellaneous Examples
+
+Advanced features, experimental patterns, and specialized use cases that don't fit neatly into other categories. These examples showcase production-ready features and edge cases.
+
+## 🎯 What's Inside
+
+This folder contains:
+- **Persistent storage** - SQLite blackboard for audit trails
+- **Edge case handling** - Complex scenarios for testing dashboard
+- **Scale testing** - 100+ agent orchestration
+- **Alternative LLMs** - Using local models with LM Studio or Transformers
+- **Cloud auth** - Azure OpenAI with DefaultAzureCredential / Managed Identity
+
+## 📚 Examples
+
+### 01 - Persistent Pizza 🗄️
+**Feature:** SQLite-backed blackboard for durable artifact storage
+
+Store all artifacts to disk for auditability, compliance, and debugging. Perfect for production systems that need:
+- Full historical trail of agent activity
+- Compliance and audit requirements
+- Post-mortem debugging
+- Replay capabilities
+
+```bash
+uv run 04-misc/01_persistent_pizza.py
+```
+
+**Key Feature:** All artifacts stored in `.flock/examples/pizza_history.db`
+
+**Concepts:**
+- `SQLiteBlackboardStore` for persistence
+- `store.ensure_schema()` for DB initialization
+- Durable artifact history
+- Production-ready storage patterns
+
+**Use Cases:**
+- Financial services (audit trails)
+- Healthcare (compliance requirements)
+- Enterprise systems (governance)
+- Post-mortem analysis
+
+---
+
+### 02 - Dashboard Edge Cases 🎨
+**Feature:** Complex multi-agent scenarios for dashboard testing
+
+Advanced dashboard testing scenario with:
+- 3+ agents in cascading workflows
+- Conditional consumption with `where` filters
+- Feedback loops
+- Multiple artifact types
+- High artifact counts (8+ artifacts)
+
+```bash
+uv run 04-misc/02-dashboard-edge-cases.py
+```
+
+**Key Features:**
+- **Filtered consumption** - Agents consume only matching artifacts
+- **Feedback loops** - Agents can re-process based on quality
+- **Auto-layout testing** - Complex graphs need auto-organization
+- **High-volume testing** - Tests dashboard with many artifacts
+
+**Dashboard Tips:**
+- Use right-click → Auto Layout for clean visualization
+- Use `browser_take_screenshot()` instead of `browser_snapshot()` (8+ artifacts exceed token limit)
+- Watch filtered edge labels show `Type(consumed/total)` counts
+
+---
+
+### 03 - Scale Test (100 Agents) 🚀
+**Feature:** Stress test orchestrator with 100+ agents
+
+Validate Flock's scalability with:
+- 100 agents in one orchestrator
+- Parallel agent execution
+- Large-scale blackboard operations
+- Performance benchmarking
+
+```bash
+uv run 04-misc/03-scale-test-100-agents.py
+```
+
+**What It Tests:**
+- Orchestrator performance at scale
+- Memory usage with many agents
+- Blackboard efficiency
+- Dashboard rendering limits
+
+**Expected Results:**
+- All agents execute successfully
+- No memory leaks
+- Reasonable execution time
+- Dashboard remains responsive
+
+**Use Cases:**
+- Production capacity planning
+- Performance benchmarking
+- Architecture validation
+- Load testing
+
+---
+
+### 04 - Persistent Pizza Dashboard 📊
+**Feature:** Dashboard with persistent storage
+
+Combines SQLite persistence with dashboard visualization:
+- Historical artifact browsing
+- Persistent blackboard state
+- Audit trail visualization
+- Time-travel debugging
+
+```bash
+uv run 04-misc/04_persistent_pizza_dashboard.py
+```
+
+**Key Features:**
+- Dashboard shows all historical artifacts
+- Artifacts survive application restarts
+- Full audit trail visible in UI
+- Production monitoring patterns
+
+**Use Cases:**
+- Production monitoring
+- Historical analysis
+- Compliance dashboards
+- Debug sessions
+
+---
+
+### 05 - LM Studio 🤖
+**Feature:** Using local LLMs with LM Studio
+
+Run Flock with locally-hosted models via LM Studio:
+- No API costs
+- Complete data privacy
+- Custom/fine-tuned models
+- Offline operation
+
+```bash
+# First: Start LM Studio on port 1234
+# Then:
+export OPENAI_BASE_URL="http://localhost:1234/v1"
+uv run 04-misc/05_lm_studio.py
+```
+
+**Setup:**
+1. Install LM Studio
+2. Download a model (e.g., Llama 3)
+3. Start local server on port 1234
+4. Set `OPENAI_BASE_URL` environment variable
+5. Run example with custom model name
+
+**Concepts:**
+- Custom LLM endpoints
+- Local model integration
+- OpenAI-compatible API
+- Model selection
+
+**Use Cases:**
+- Cost optimization (no API fees)
+- Data privacy requirements
+- Custom/fine-tuned models
+- Air-gapped environments
+- Development without internet
+
+---
+
+### 06 - PRD Generator 📋
+**Feature:** Product Requirements Document generation with comprehensive structure
+
+Generate complete PRDs with structured sections:
+- Stakeholder management (RACI)
+- Business goals and metrics
+- Technical requirements
+- Risk assessment
+- Timeline and milestones
+- Success criteria
+
+```bash
+uv run 04-misc/06_prd.py
+```
+
+**Key Features:**
+- **Structured output** - Complete PRD with all standard sections
+- **Stakeholder tracking** - RACI matrix and contact management
+- **Business alignment** - Goals, metrics, and success criteria
+- **Risk management** - Identified risks with mitigation strategies
+- **Timeline planning** - Milestones and dependencies
+
+**Concepts:**
+- Complex nested Pydantic models
+- Multi-section document generation
+- Structured business documentation
+- Real-world document templates
+
+**Use Cases:**
+- Product planning
+- Requirements documentation
+- Stakeholder communication
+- Project management
+- Technical specification
+
+---
+
+### 07 - Logging Configuration 📝
+**Feature:** Advanced logging configuration and control
+
+Demonstrate Flock's logging system with granular control:
+- Per-module log levels
+- Flock-specific logging
+- External library filtering
+- Debug mode configuration
+
+```bash
+uv run 04-misc/07_logging.py
+```
+
+**Key Features:**
+- **Granular control** - Set log levels per module
+- **Flock logging** - Control framework logging separately
+- **External filtering** - Suppress noisy third-party logs
+- **Debug mode** - Enable detailed engine logging
+
+**Concepts:**
+- `configure_logging()` function
+- Log level hierarchy
+- Module-specific configuration
+- Production vs development logging
+
+**Use Cases:**
+- Debugging agent execution
+- Production logging setup
+- Noise reduction in logs
+- Performance monitoring
+- Troubleshooting
+
+**Example Configuration:**
+```python
+from flock.logging.logging import configure_logging
+
+configure_logging(
+    flock_level="DEBUG",           # Flock framework logs
+    external_level="ERROR",        # Third-party libraries
+    specific_levels={
+        "flock.engines.dspy_engine": "DEBUG",  # Detailed engine logs
+    }
+)
+```
+
+---
+
+### 08 - Local Transformers 🤗
+**Feature:** Running Flock directly on local Hugging Face Transformers
+
+Use a local Transformers backend when you want:
+- No hosted API dependency
+- Local execution on your own hardware
+- Support for quantized Hugging Face models
+- A reproducible offline workflow
+
+```bash
+uv run 04-misc/08_local_transformers.py
+```
+
+**Key Features:**
+- **Transformers provider** - Run via `transformers/...` model names
+- **Local inference** - Keep prompts and outputs on your own hardware
+- **Quantized models** - Demonstrates a practical 4-bit model choice
+- **No API keys** - Ideal for fully local testing
+
+---
+
+### 09 - Azure DefaultAzureCredential ☁️
+**Feature:** Azure OpenAI auth with Entra ID / Managed Identity
+
+Use Azure OpenAI without hard-coded secrets by combining
+`DefaultAzureCredential` with Flock's Azure token-provider helper. The same
+example works for local development (`az login`) and Azure-hosted workloads
+(Managed Identity) while keeping endpoint settings in environment variables.
+
+```bash
+# Install Azure auth support first:
+uv sync --extra azure
+
+export DEFAULT_MODEL="azure/<deployment-name>"
+export AZURE_API_BASE="https://<resource>.openai.azure.com/"
+export AZURE_API_VERSION="2024-12-01-preview"  # optional
+export AZURE_CLIENT_ID="<user-assigned-managed-identity-client-id>"  # optional
+
+uv run 04-misc/09_azure_default_credential.py
+```
+
+**Key Features:**
+- **DefaultAzureCredential** - Uses Azure CLI, Managed Identity, or service-principal credentials
+- **Managed Identity ready** - Works with system- or user-assigned identities
+- **Local development friendly** - Uses the normal `DefaultAzureCredential` fallback chain
+- **DSPyEngine integration** - Passes `azure_ad_token_provider` through `lm_kwargs`
+- **No hard-coded secrets** - Keeps Azure API keys out of source code
+
+**Prerequisite:** Assign the calling identity an Azure OpenAI role such as
+`Cognitive Services OpenAI User` on the target resource.
+
+**Use Cases:**
+- Local development with `az login`
+- App Service / Container Apps / Functions with Managed Identity
+- Enterprise deployments that forbid stored API keys
+
+---
+
+## 🎓 When to Use These Examples
+
+| Example | Use Case |
+|---------|----------|
+| **01 - Persistent Pizza** | Need audit trails, compliance, replay |
+| **02 - Edge Cases** | Testing dashboard with complex scenarios |
+| **03 - Scale Test** | Validate architecture at 100+ agents |
+| **04 - Dashboard + Persistence** | Production monitoring setup |
+| **05 - LM Studio** | Local LLMs, privacy, cost optimization |
+| **06 - PRD Generator** | Product planning, requirements documentation |
+| **07 - Logging Configuration** | Debugging, production logging setup |
+| **08 - Local Transformers** | Offline/local inference with Hugging Face models |
+| **09 - Azure DefaultAzureCredential** | Azure OpenAI with Entra ID / Managed Identity auth |
+
+## 🔑 Key Features Demonstrated
+
+### Persistent Storage
+- SQLite-backed blackboard
+- Schema management
+- Historical queries
+- Retention policies
+
+### Scale & Performance
+- 100+ agent orchestration
+- Parallel execution
+- Memory efficiency
+- Dashboard rendering
+
+### Alternative LLMs
+- Custom endpoints
+- Local models
+- OpenAI-compatible APIs
+- Model flexibility
+
+### Advanced Dashboard Testing
+- Complex multi-agent graphs
+- Auto-layout usage
+- High artifact volumes
+- Filtered consumption visualization
+
+## 💡 Production Patterns
+
+These examples showcase production-ready patterns:
+
+### Persistence Pattern
+```python
+from flock.store import SQLiteBlackboardStore
+
+store = SQLiteBlackboardStore(".flock/history.db")
+await store.ensure_schema()
+flock = Flock("openai/gpt-4.1", store=store)
+
+# All artifacts now persisted!
+```
+
+### Custom LLM Pattern
+```python
+# Point to local LLM server
+import os
+os.environ["OPENAI_BASE_URL"] = "http://localhost:1234/v1"
+
+flock = Flock("openai/your-model-name")
+```
+
+### Scale Testing Pattern
+```python
+# Register many agents programmatically
+for i in range(100):
+    flock.agent(f"agent_{i}").consumes(Input).publishes(Output)
+
+# Test parallel execution
+await flock.publish_many([Input() for _ in range(100)])
+await flock.run_until_idle()
+```
+
+## 🚀 Next Steps
+
+After exploring these examples:
+- **05-engines/** - Custom processing logic
+- **06-agent-components/** - Per-agent behavior extensions
+- **07-orchestrator-components/** - Global coordination patterns
+- **03-claudes-workshop/** - Production patterns and best practices
+
+## 📖 Additional Resources
+
+- **AGENTS.md** - "Persistent Blackboard History" section
+- **AGENTS.md** - "Test Isolation" section for scale testing
+- [Dashboard Guide](https://github.com/whiteducksoftware/flock/blob/main/docs/guides/dashboard.md)
+- [Configuration Guide](https://github.com/whiteducksoftware/flock/blob/main/docs/reference/configuration.md)
+
+---
+
+**Ready to explore advanced features? Start with persistent storage! 🗄️**
