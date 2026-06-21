@@ -30,3 +30,18 @@ def format_hints(hints: list[dict[str, Any]]) -> str:
 
 def format_json_block(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
+
+
+def format_skills(skills) -> str:
+    if not skills:
+        return ""
+    lines = [
+        "## Available Skills (prefer these)",
+        "You have these skills installed at .claude/skills/<name>/SKILL.md. When a task matches "
+        "a skill, READ its SKILL.md and follow it; prefer these skills over ad-hoc approaches.",
+        "",
+    ]
+    for s in skills:
+        desc = (s.description or "").strip()
+        lines.append(f"- {s.name}: {desc}  (.claude/skills/{s.name}/SKILL.md)")
+    return "\n".join(lines)
