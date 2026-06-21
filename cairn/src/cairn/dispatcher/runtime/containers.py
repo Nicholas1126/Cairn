@@ -20,6 +20,7 @@ LOG = logging.getLogger(__name__)
 class ContainerManager:
     _PREFIX = "cairn-dispatch-"
     _STARTUP_PREFIX = "cairn-startup-healthcheck-"
+    _PROJECT_MOUNT = "/home/kali/workspace/project"
 
     def __init__(self, config: ContainerConfig):
         self._config = config
@@ -37,12 +38,12 @@ class ContainerManager:
         sanitized = project_id.replace("/", "-")
         return f"{self._PREFIX}{sanitized}"
 
-    def ensure_running(self, project_id: str) -> str:
+    def ensure_running(self, project_id: str, project_root: str | None = None) -> str:
         name = self.container_name(project_id)
         with self._ensure_running_lock(name):
-            return self._ensure_running_locked(project_id, name)
+            return self._ensure_running_locked(project_id, name, project_root)
 
-    def _ensure_running_locked(self, project_id: str, name: str) -> str:
+    def _ensure_running_locked(self, project_id: str, name: str, project_root: str | None = None) -> str:
         state = self.inspect_state(name)
         if state == "running":
             LOG.debug("container already running project=%s container=%s", project_id, name)
@@ -52,14 +53,19 @@ class ContainerManager:
             self._start_existing(name)
             return name
         LOG.info("creating container project=%s container=%s image=%s", project_id, name, self._config.image)
+        run_kwargs = dict(
+            detach=True,
+            name=name,
+            network_mode=self._config.network_mode,
+            cap_add=self._config.cap_add or None,
+        )
+        if project_root:
+            run_kwargs["volumes"] = {project_root: {"bind": self._PROJECT_MOUNT, "mode": "ro"}}
         try:
             self._client.containers.run(
                 self._config.image,
                 ["sleep", "infinity"],
-                detach=True,
-                name=name,
-                network_mode=self._config.network_mode,
-                cap_add=self._config.cap_add or None,
+                **run_kwargs,
             )
             LOG.info("created container project=%s container=%s", project_id, name)
             return name

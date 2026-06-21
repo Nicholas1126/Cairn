@@ -26,12 +26,19 @@ class LocalRuntime:
     def _workspace(self, project_id: str) -> Path:
         return self._root / project_id.replace("/", "-")
 
-    def ensure_running(self, project_id: str) -> str:
+    def ensure_running(self, project_id: str, project_root: str | None = None) -> str:
         ws = self._workspace(project_id)
         first = not ws.exists()
         ws.mkdir(parents=True, exist_ok=True)
         if first:
             self._seed_agent_config(ws)
+        if project_root:
+            link = ws / "project"
+            if not link.exists() and not link.is_symlink():
+                try:
+                    link.symlink_to(project_root, target_is_directory=True)
+                except OSError:
+                    pass  # knowledge is an enhancement, not required; don't fail the task
         return str(ws)
 
     def _seed_agent_config(self, ws: Path) -> None:

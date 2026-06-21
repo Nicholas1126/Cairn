@@ -24,7 +24,7 @@ class _FakeProc:
 
 
 class _FakeRuntime:
-    def ensure_running(self, key): return "/tmp/ws"
+    def ensure_running(self, key, project_root=None): return "/tmp/ws"
     def build_exec_process(self, key, env, argv): return _FakeProc(argv)
 
 
